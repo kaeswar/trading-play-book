@@ -1,0 +1,76 @@
+{
+  "name": "trading-journal",
+  "version": "1.0.0",
+  "description": "Trading Play Book — A disciplined pre/post market trading journal",
+  "author": {
+    "name": "Kaeswar",
+    "email": "kaeswar@gmail.com"
+  },
+  "main": "main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "vite build && electron-builder",
+    "generate-icons": "node scripts/generate-icons.js",
+    "electron:rebuild": "electron-rebuild -f -w better-sqlite3",
+    "postinstall": "electron-builder install-app-deps",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "react": "^18.3.1",
+    "react-datepicker": "^9.1.0",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "concurrently": "^8.2.2",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "vite": "^5.3.1",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.tradingplaybook.app",
+    "productName": "Trading Play Book",
+    "icon": "assets/icon.ico",
+    "asar": true,
+    "asarUnpack": [
+      "**/better-sqlite3/**",
+      "**/*.node"
+    ],
+    "files": [
+      "main.js",
+      "preload.js",
+      "dist/**/*",
+      "src/main/**/*",
+      "src/shared/**/*",
+      "assets/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Trading Play Book",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico"
+    }
+  }
+}

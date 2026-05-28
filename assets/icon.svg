@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4338ca"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="20" fill="url(#g)"/>
+  <!-- Trending-up icon scaled from 24x24 to 100x100 (×4.167), stroke scaled proportionally -->
+  <path
+    d="M54.2 29.2h33.3m0 0v33.3m0-33.3l-33.3 33.3-16.7-16.7-25 25"
+    fill="none"
+    stroke="white"
+    stroke-width="7"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output (Vite)
+dist/
+
+# Electron packaged output
+release/
+
+# Local dev database (personal trading data — never commit)
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local

@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Image Viewer — Trading Journal</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0f1117;
+      color: #e2e8f0;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: #161922;
+      border-bottom: 1px solid rgba(100, 116, 139, 0.2);
+      -webkit-app-region: drag;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .toolbar-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #94a3b8;
+      max-width: 400px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .toolbar-center {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      -webkit-app-region: no-drag;
+    }
+
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      -webkit-app-region: no-drag;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 6px;
+      background: rgba(100, 116, 139, 0.15);
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn:hover {
+      background: rgba(100, 116, 139, 0.3);
+      color: #e2e8f0;
+    }
+
+    .btn:active {
+      transform: scale(0.95);
+    }
+
+    .btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .zoom-display {
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: #64748b;
+      min-width: 50px;
+      text-align: center;
+      padding: 0 8px;
+    }
+
+    .separator {
+      width: 1px;
+      height: 20px;
+      background: rgba(100, 116, 139, 0.2);
+      margin: 0 4px;
+    }
+
+    /* Image Container */
+    .image-container {
+      flex: 1;
+      overflow: hidden;
+      cursor: grab;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .image-container.dragging {
+      cursor: grabbing;
+    }
+
+    .image-container.zoomed-in {
+      cursor: zoom-in;
+    }
+
+    .image-container.zoomed-out {
+      cursor: zoom-out;
+    }
+
+    .image-wrapper {
+      position: absolute;
+      transform-origin: center center;
+      transition: none;
+    }
+
+    .image-wrapper img {
+      display: block;
+      max-width: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    /* Help hint */
+    .hint {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(22, 25, 34, 0.9);
+      border: 1px solid rgba(100, 116, 139, 0.2);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 11px;
+      color: #64748b;
+      pointer-events: none;
+      opacity: 1;
+      transition: opacity 0.3s;
+    }
+
+    .hint.hidden {
+      opacity: 0;
+    }
+
+    /* Loading */
+    .loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0f1117;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(99, 102, 241, 0.2);
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Error */
+    .error {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      color: #ef4444;
+    }
+
+    .error svg { width: 40px; height: 40px; }
+    .error p { font-size: 14px; }
+
+    /* Minimap */
+    .minimap {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      width: 180px;
+      height: 120px;
+      background: rgba(22, 25, 34, 0.95);
+      border: 1px solid rgba(100, 116, 139, 0.3);
+      border-radius: 8px;
+      overflow: hidden;
+      display: none;
+      z-index: 5;
+    }
+
+    .minimap.visible {
+      display: block;
+    }
+
+    .minimap img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      opacity: 0.6;
+    }
+
+    .minimap-viewport {
+      position: absolute;
+      border: 1.5px solid #6366f1;
+      background: rgba(99, 102, 241, 0.1);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span class="toolbar-title" id="fileName">Loading...</span>
+    </div>
+
+    <div class="toolbar-center">
+      <button class="btn" id="btnZoomOut" title="Zoom Out (-)">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+      </button>
+      <span class="zoom-display" id="zoomLevel">100%</span>
+      <button class="btn" id="btnZoomIn" title="Zoom In (+)">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      </button>
+      <div class="separator"></div>
+      <button class="btn" id="btnFit" title="Fit to Window (0)">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+      </button>
+      <button class="btn" id="btnFill" title="Fill Window">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"/></svg>
+      </button>
+      <div class="separator"></div>
+      <button class="btn" id="btnRotate" title="Rotate (R)">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      </button>
+    </div>
+
+    <div class="toolbar-right">
+      <button class="btn" id="btnOpenExternal" title="Open in OS Viewer">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Image Area -->
+  <div class="image-container" id="imageContainer">
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+    </div>
+    <div class="error" id="error">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+      <p>Failed to load image</p>
+    </div>
+    <div class="image-wrapper" id="imageWrapper">
+      <img id="image" alt="" />
+    </div>
+    <div class="hint" id="hint">Scroll to zoom &middot; Drag to pan &middot; Double-click to fit</div>
+  </div>
+
+  <!-- Minimap -->
+  <div class="minimap" id="minimap">
+    <img id="minimapImage" alt="" />
+    <div class="minimap-viewport" id="minimapViewport"></div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    // State
+    let zoom = 1;
+    let panX = 0, panY = 0;
+    let rotation = 0;
+    let isDragging = false;
+    let dragStartX, dragStartY, startPanX, startPanY;
+    let imageNatW = 0, imageNatH = 0;
+    let fitZoom = 1;
+
+    // Elements
+    const container = document.getElementById('imageContainer');
+    const wrapper = document.getElementById('imageWrapper');
+    const img = document.getElementById('image');
+    const loading = document.getElementById('loading');
+    const error = document.getElementById('error');
+    const zoomDisplay = document.getElementById('zoomLevel');
+    const fileName = document.getElementById('fileName');
+    const hint = document.getElementById('hint');
+    const minimap = document.getElementById('minimap');
+    const minimapViewport = document.getElementById('minimapViewport');
+
+    // Load image path from URL params
+    const params = new URLSearchParams(window.location.search);
+    const imagePath = params.get('path');
+    const imageName = params.get('name') || 'Image';
+
+    fileName.textContent = decodeURIComponent(imageName);
+
+    if (imagePath) {
+      img.src = decodeURIComponent(imagePath);
+    }
+
+    img.onload = () => {
+      loading.style.display = 'none';
+      imageNatW = img.naturalWidth;
+      imageNatH = img.naturalHeight;
+      fitToWindow();
+
+      // Show minimap for large images
+      if (imageNatW > 800 || imageNatH > 600) {
+        minimap.classList.add('visible');
+        document.getElementById('minimapImage').src = img.src;
+      }
+
+      // Hide hint after 3 seconds
+      setTimeout(() => hint.classList.add('hidden'), 3000);
+    };
+
+    img.onerror = () => {
+      loading.style.display = 'none';
+      error.style.display = 'flex';
+    };
+
+    // Transform
+    function applyTransform() {
+      wrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom}) rotate(${rotation}deg)`;
+      zoomDisplay.textContent = Math.round(zoom * 100) + '%';
+      updateMinimap();
+    }
+
+    function fitToWindow() {
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+      const padding = 40;
+      const w = rotation % 180 === 0 ? imageNatW : imageNatH;
+      const h = rotation % 180 === 0 ? imageNatH : imageNatW;
+      fitZoom = Math.min((cw - padding) / w, (ch - padding) / h, 1);
+      zoom = fitZoom;
+      panX = 0;
+      panY = 0;
+      applyTransform();
+    }
+
+    function fillWindow() {
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+      const w = rotation % 180 === 0 ? imageNatW : imageNatH;
+      const h = rotation % 180 === 0 ? imageNatH : imageNatW;
+      zoom = Math.max(cw / w, ch / h);
+      panX = 0;
+      panY = 0;
+      applyTransform();
+    }
+
+    function zoomTo(newZoom, cx, cy) {
+      cx = cx ?? container.clientWidth / 2;
+      cy = cy ?? container.clientHeight / 2;
+      const oldZoom = zoom;
+      zoom = Math.max(0.05, Math.min(50, newZoom));
+      const scale = zoom / oldZoom;
+      panX = cx - scale * (cx - panX);
+      panY = cy - scale * (cy - panY);
+      applyTransform();
+    }
+
+    // Minimap
+    function updateMinimap() {
+      if (!minimap.classList.contains('visible')) return;
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+      const w = rotation % 180 === 0 ? imageNatW : imageNatH;
+      const h = rotation % 180 === 0 ? imageNatH : imageNatW;
+
+      const displayW = w * zoom;
+      const displayH = h * zoom;
+
+      const mw = minimap.clientWidth;
+      const mh = minimap.clientHeight;
+
+      const scale = Math.min(mw / w, mh / h);
+
+      const vpW = Math.min(mw, (cw / displayW) * mw * scale / scale);
+      const vpH = Math.min(mh, (ch / displayH) * mh * scale / scale);
+
+      const vpX = (mw / 2) - (panX / displayW) * mw * scale - vpW / 2;
+      const vpY = (mh / 2) - (panY / displayH) * mh * scale - vpH / 2;
+
+      minimapViewport.style.width = vpW + 'px';
+      minimapViewport.style.height = vpH + 'px';
+      minimapViewport.style.left = Math.max(0, Math.min(mw - vpW, vpX)) + 'px';
+      minimapViewport.style.top = Math.max(0, Math.min(mh - vpH, vpY)) + 'px';
+    }
+
+    // Mouse wheel zoom
+    container.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.12 : 0.89;
+      const rect = container.getBoundingClientRect();
+      zoomTo(zoom * factor, e.clientX - rect.left, e.clientY - rect.top);
+    }, { passive: false });
+
+    // Pan
+    container.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      startPanX = panX;
+      startPanY = panY;
+      container.classList.add('dragging');
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      panX = startPanX + (e.clientX - dragStartX);
+      panY = startPanY + (e.clientY - dragStartY);
+      applyTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+      container.classList.remove('dragging');
+    });
+
+    // Double-click to fit
+    container.addEventListener('dblclick', () => {
+      fitToWindow();
+    });
+
+    // Keyboard
+    window.addEventListener('keydown', (e) => {
+      switch (e.key) {
+        case '+':
+        case '=':
+          zoomTo(zoom * 1.25);
+          break;
+        case '-':
+          zoomTo(zoom * 0.8);
+          break;
+        case '0':
+          fitToWindow();
+          break;
+        case 'r':
+        case 'R':
+          rotation = (rotation + 90) % 360;
+          applyTransform();
+          break;
+        case 'Escape':
+          window.close();
+          break;
+      }
+    });
+
+    // Toolbar buttons
+    document.getElementById('btnZoomIn').addEventListener('click', () => zoomTo(zoom * 1.25));
+    document.getElementById('btnZoomOut').addEventListener('click', () => zoomTo(zoom * 0.8));
+    document.getElementById('btnFit').addEventListener('click', fitToWindow);
+    document.getElementById('btnFill').addEventListener('click', fillWindow);
+    document.getElementById('btnRotate').addEventListener('click', () => {
+      rotation = (rotation + 90) % 360;
+      applyTransform();
+    });
+    document.getElementById('btnOpenExternal').addEventListener('click', () => {
+      ipcRenderer.invoke('image:openExternalByPath', img.src.replace('file:///', ''));
+    });
+
+    // Resize
+    window.addEventListener('resize', () => {
+      if (zoom === fitZoom) fitToWindow();
+    });
+  </script>
+</body>
+</html>

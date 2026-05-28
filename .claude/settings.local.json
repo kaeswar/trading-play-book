@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs wc -l)",
+      "Bash(node -e ' *)",
+      "Bash(npx vite *)",
+      "Bash(mkdir -p \"D:/TPB_OC_Version/trading-journal/assets\")",
+      "Bash(mkdir -p \"D:/TPB_OC_Version/trading-journal/scripts\")",
+      "Bash(node scripts/generate-icons.js)",
+      "Bash(node *)",
+      "Bash(npm run *)",
+      "Bash(gh --version)",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ]
+  }
+}
