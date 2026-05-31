@@ -92,9 +92,9 @@ export const STOCK_PLAN_BIAS_TAGS = ['Super Bullish', 'Bullish', 'Range Bound', 
 export const STOCK_PLAN_BIAS_COLORS = {
   'Super Bullish': { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30' },
   'Bullish':       { bg: 'bg-cyan-500/20',    text: 'text-cyan-400',    border: 'border-cyan-500/30' },
-  'Range Bound':   { bg: 'bg-amber-500/20',   text: 'text-amber-400',   border: 'border-amber-500/30' },
-  'Bearish':       { bg: 'bg-rose-500/20',    text: 'text-rose-400',    border: 'border-rose-500/30' },
-  'Super Bearish': { bg: 'bg-red-700/20',     text: 'text-red-300',     border: 'border-red-700/30' },
+  'Range Bound':   { bg: 'bg-slate-500/20',   text: 'text-slate-400',   border: 'border-slate-500/30' },
+  'Bearish':       { bg: 'bg-red-500/20',     text: 'text-red-400',     border: 'border-red-500/30' },
+  'Super Bearish': { bg: 'bg-red-950/60',     text: 'text-red-200',     border: 'border-red-800/70' },
 };
 
 // Stock Plan constants
@@ -172,8 +172,11 @@ export const INTRADAY_TIME_OPTIONS = (() => {
 })();
 
 export const TIMEFRAME_COLORS = {
-  Weekly: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/30' },
-  Daily: { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/30' },
+  Monthly: { bg: 'bg-rose-500/20',   text: 'text-rose-400',   border: 'border-rose-500/30' },
+  Weekly:  { bg: 'bg-blue-500/20',   text: 'text-blue-400',   border: 'border-blue-500/30' },
+  Daily:   { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/30' },
+  '4Hrs':  { bg: 'bg-amber-500/20',  text: 'text-amber-400',  border: 'border-amber-500/30' },
+  '1Hrs':  { bg: 'bg-teal-500/20',   text: 'text-teal-400',   border: 'border-teal-500/30' },
 };
 
 export function getToday() {

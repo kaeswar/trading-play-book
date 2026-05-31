@@ -13,10 +13,10 @@ module.exports = {
     ).get(id);
   },
 
-  create({ symbolId, stockName, timeframe, biasTag, analysis, entryPrice, targetPrice, stopLoss, chartPath }) {
+  create({ symbolId, stockName, timeframe, biasTag, analysis, entryPrice, targetPrice, stopLoss, chartPath, planDate, executionStatus }) {
     const result = getDb().prepare(
-      `INSERT INTO stock_plan (symbol_id, stock_name, timeframe, bias_tag, analysis, entry_price, target_price, stop_loss, chart_path)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO stock_plan (symbol_id, stock_name, timeframe, bias_tag, analysis, entry_price, target_price, stop_loss, chart_path, execution_status, plan_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       symbolId ?? null,
       stockName,
@@ -26,17 +26,19 @@ module.exports = {
       entryPrice ?? null,
       targetPrice ?? null,
       stopLoss ?? null,
-      chartPath || null
+      chartPath || null,
+      executionStatus || 'Waiting',
+      planDate || new Date().toISOString().slice(0, 10)
     );
     return this.getById(result.lastInsertRowid);
   },
 
-  update(id, { symbolId, stockName, timeframe, biasTag, analysis, entryPrice, targetPrice, stopLoss, chartPath }) {
+  update(id, { symbolId, stockName, timeframe, biasTag, analysis, entryPrice, targetPrice, stopLoss, chartPath, planDate }) {
     getDb().prepare(
       `UPDATE stock_plan
        SET symbol_id = ?, stock_name = ?, timeframe = ?, bias_tag = ?, analysis = ?,
            entry_price = ?, target_price = ?, stop_loss = ?,
-           chart_path = ?, updated_at = CURRENT_TIMESTAMP
+           chart_path = ?, plan_date = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`
     ).run(
       symbolId ?? null,
@@ -48,6 +50,7 @@ module.exports = {
       targetPrice ?? null,
       stopLoss ?? null,
       chartPath || null,
+      planDate || null,
       id
     );
     return this.getById(id);

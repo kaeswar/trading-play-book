@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStockPlan } from '../../hooks/useStockPlan';
 import { useApp } from '../../store/appStore';
-import { TIMEFRAMES, STOCK_PLAN_BIAS_TAGS, STOCK_PLAN_BIAS_COLORS } from '../../../shared/constants';
+import { TIMEFRAMES, STOCK_PLAN_BIAS_TAGS, STOCK_PLAN_BIAS_COLORS, EXECUTION_STATUSES, EXECUTION_STATUS_COLORS } from '../../../shared/constants';
 
 export default function StockPlanForm({ onCreated, onCancel }) {
   const { createPlan, importChart } = useStockPlan();
@@ -14,6 +14,8 @@ export default function StockPlanForm({ onCreated, onCancel }) {
   const [entryPrice, setEntryPrice] = useState('');
   const [targetPrice, setTargetPrice] = useState('');
   const [stopLoss, setStopLoss] = useState('');
+  const [planDate, setPlanDate] = useState(new Date().toISOString().slice(0, 10));
+  const [executionStatus, setExecutionStatus] = useState('Waiting');
   const [chartFile, setChartFile] = useState(null);
   const [chartRelPath, setChartRelPath] = useState(null);
   const [chartSrc, setChartSrc] = useState(null);
@@ -91,10 +93,12 @@ export default function StockPlanForm({ onCreated, onCancel }) {
         targetPrice: targetPrice ? parseFloat(targetPrice) : null,
         stopLoss: stopLoss ? parseFloat(stopLoss) : null,
         chartPath,
+        planDate,
+        executionStatus,
       });
       if (plan) {
         showNotification('Plan created', 'success');
-        onCreated(plan.id);
+        onCreated();
       }
     } catch (err) {
       showNotification('Failed to create plan', 'error');
@@ -118,7 +122,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
       <div className="glass-card p-5 space-y-4">
         <h3 className="text-base font-semibold text-gray-200">New Stock Swing Plan</h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Stock Name */}
           <div>
             <label className="block text-[10px] text-gray-500 mb-1 uppercase">Stock Name</label>
@@ -145,6 +149,17 @@ export default function StockPlanForm({ onCreated, onCancel }) {
                 <option key={tf} value={tf}>{tf}</option>
               ))}
             </select>
+          </div>
+
+          {/* Plan Date */}
+          <div>
+            <label className="block text-[10px] text-gray-500 mb-1 uppercase">Plan Date</label>
+            <input
+              type="date"
+              value={planDate}
+              onChange={(e) => setPlanDate(e.target.value)}
+              className="input-field text-sm"
+            />
           </div>
         </div>
 
@@ -262,6 +277,31 @@ export default function StockPlanForm({ onCreated, onCancel }) {
               <p className="text-xs text-gray-500 group-hover:text-gray-400 transition-colors">Click to upload or Ctrl+V to paste</p>
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Execution Status */}
+      <div className="glass-card p-4">
+        <label className="block text-[10px] text-gray-500 mb-3 uppercase">Execution Status</label>
+        <div className="flex flex-wrap gap-2">
+          {EXECUTION_STATUSES.map((status) => {
+            const colors = EXECUTION_STATUS_COLORS[status];
+            const isActive = executionStatus === status;
+            return (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setExecutionStatus(isActive ? 'Waiting' : status)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
+                  isActive
+                    ? `${colors.bg} ${colors.text} ${colors.border}`
+                    : 'bg-surface-700 text-gray-400 border-surface-600 hover:border-surface-500'
+                }`}
+              >
+                {status}
+              </button>
+            );
+          })}
         </div>
       </div>
 

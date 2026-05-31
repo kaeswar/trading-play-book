@@ -21,6 +21,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
   const [entryPrice, setEntryPrice] = useState('');
   const [targetPrice, setTargetPrice] = useState('');
   const [stopLoss, setStopLoss] = useState('');
+  const [planDate, setPlanDate] = useState('');
   const [chartPath, setChartPath] = useState(null);
   const [chartSrc, setChartSrc] = useState(null);
 
@@ -42,6 +43,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
         setEntryPrice(data.entry_price != null ? String(data.entry_price) : '');
         setTargetPrice(data.target_price != null ? String(data.target_price) : '');
         setStopLoss(data.stop_loss != null ? String(data.stop_loss) : '');
+        setPlanDate(data.plan_date || data.created_at?.slice(0, 10) || '');
         setChartPath(data.chart_path);
         if (data.chart_path) {
           const fullPath = await window.api.image.getFullPath(data.chart_path);
@@ -76,10 +78,11 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
         targetPrice: targetPrice ? parseFloat(targetPrice) : null,
         stopLoss: stopLoss ? parseFloat(stopLoss) : null,
         chartPath,
+        planDate: planDate || null,
       });
       if (updated) {
-        setPlan(updated);
-        showNotification('Plan saved', 'success');
+        showNotification('Plan updated', 'success');
+        onBack();
       }
     } catch (err) {
       showNotification('Failed to save', 'error');
@@ -89,12 +92,9 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
   };
 
   const handleStatusChange = async (status) => {
-    const newStatus = plan.execution_status === status ? null : status;
-    const updated = await updateStatus(planId, newStatus);
-    if (updated) {
-      setPlan(updated);
-      showNotification(newStatus ? `Marked as ${newStatus}` : 'Status cleared', 'success');
-    }
+    if (plan.execution_status === status) return;
+    const updated = await updateStatus(planId, status);
+    if (updated) setPlan(updated);
   };
 
   const handleDelete = async () => {
@@ -267,7 +267,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
 
       {/* Plan details */}
       <div className="glass-card p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Stock Name */}
           <div>
             <label className="block text-[10px] text-gray-500 mb-1 uppercase">Stock Name</label>
@@ -296,6 +296,18 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
                 <option key={tf} value={tf}>{tf}</option>
               ))}
             </select>
+          </div>
+
+          {/* Plan Date */}
+          <div>
+            <label className="block text-[10px] text-gray-500 mb-1 uppercase">Plan Date</label>
+            <input
+              type="date"
+              value={planDate}
+              onChange={(e) => setPlanDate(e.target.value)}
+              readOnly={readOnly}
+              className={`input-field text-sm ${readOnly ? 'opacity-60 cursor-default' : ''}`}
+            />
           </div>
         </div>
 
@@ -384,15 +396,15 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
         <div className="flex gap-2">
           {EXECUTION_STATUSES.map((status) => {
             const colors = EXECUTION_STATUS_COLORS[status];
-            const isActive = plan.execution_status === status;
+            const isActive = (plan.execution_status || 'Waiting') === status;
             return (
               <button
                 key={status}
                 onClick={() => !readOnly && handleStatusChange(status)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
                   isActive
-                    ? `${colors.bg} ${colors.text} border ${colors.border}`
-                    : `bg-surface-700 text-gray-400 border border-surface-600 ${readOnly ? 'cursor-default' : 'hover:border-surface-500'}`
+                    ? `${colors.bg} ${colors.text} ${colors.border}`
+                    : `bg-surface-700 text-gray-400 border-surface-600 ${readOnly ? 'cursor-default' : 'hover:border-surface-500'}`
                 }`}
               >
                 {status}
@@ -400,11 +412,6 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
             );
           })}
         </div>
-        {plan.execution_status && !readOnly && (
-          <button onClick={() => handleStatusChange(null)} className="text-xs text-gray-500 hover:text-gray-400 mt-2">
-            Clear status
-          </button>
-        )}
       </div>
 
       {/* Save button — hidden in readOnly */}
@@ -419,16 +426,15 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
                 </svg>
                 Saving...
               </span>
-            ) : 'Save Plan'}
+            ) : 'Update Plan'}
           </button>
         </div>
       )}
 
       {/* Meta info */}
       <div className="text-xs text-gray-600 text-right">
-        Created: {new Date(plan.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
         {plan.updated_at !== plan.created_at && (
-          <> &middot; Updated: {new Date(plan.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</>
+          <>Updated: {new Date(plan.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</>
         )}
       </div>
     </div>

@@ -36,9 +36,8 @@ export default function StockPlansView() {
     loadPlans();
   };
 
-  const handlePlanCreated = (planId) => {
+  const handlePlanCreated = () => {
     setShowForm(false);
-    setSelectedPlanId(planId);
     loadPlans();
   };
 

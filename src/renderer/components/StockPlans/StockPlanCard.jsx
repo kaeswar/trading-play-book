@@ -17,7 +17,7 @@ export default function StockPlanCard({ plan, onClick, onDelete }) {
   }, [plan.chart_path]);
 
   const statusColor = plan.execution_status ? EXECUTION_STATUS_COLORS[plan.execution_status] : null;
-  const tfColor = TIMEFRAME_COLORS[plan.timeframe];
+  const tfColor = TIMEFRAME_COLORS[plan.timeframe] || { bg: 'bg-surface-600', text: 'text-gray-400', border: 'border-surface-500' };
   const biasColor = plan.bias_tag ? STOCK_PLAN_BIAS_COLORS[plan.bias_tag] : null;
 
   const handleDelete = (e) => {
@@ -81,6 +81,13 @@ export default function StockPlanCard({ plan, onClick, onDelete }) {
           {/* Analysis preview */}
           {plan.analysis && (
             <p className="text-xs text-gray-500 mt-1 truncate">{plan.analysis}</p>
+          )}
+
+          {/* Plan date */}
+          {plan.plan_date && (
+            <p className="text-[10px] text-gray-600 mt-1">
+              {new Date(plan.plan_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </p>
           )}
         </div>
 

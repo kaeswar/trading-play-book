@@ -17,6 +17,16 @@ function getDb() {
 function initializeDatabase() {
   const database = getDb();
 
+  // Clean up any leftover temp tables from previously interrupted migrations
+  try {
+    database.exec(`
+      DROP TABLE IF EXISTS stock_plan_new;
+      DROP TABLE IF EXISTS stock_plan_bias_new;
+      DROP TABLE IF EXISTS stock_plan_migrated;
+      DROP TABLE IF EXISTS custom_plan_bias_new;
+    `);
+  } catch (_) {}
+
   // Migrate stock_plan: drop if exists with old CHECK constraint (missing 'Waiting')
   try {
     const tableSql = database.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='stock_plan'").get();
@@ -161,43 +171,17 @@ function initializeDatabase() {
     }
   } catch (_) { /* stock_plan doesn't exist yet — will be created below with symbol_id */ }
 
-  // Migrate stock_plan: expand timeframe CHECK to include Monthly, 4Hrs, 1Hrs
+  // Migrate stock_plan: unified migration — expand timeframe CHECK and add bias_tag with Range Bound
   try {
     const spSql = database.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='stock_plan'").get();
-    if (spSql && !spSql.sql.includes("'4Hrs'")) {
-      database.pragma('foreign_keys = OFF');
-      database.exec(`
-        CREATE TABLE IF NOT EXISTS stock_plan_new (
-          id               INTEGER PRIMARY KEY AUTOINCREMENT,
-          symbol_id        INTEGER REFERENCES symbol(id),
-          stock_name       TEXT NOT NULL,
-          timeframe        TEXT NOT NULL CHECK(timeframe IN ('Monthly', 'Weekly', 'Daily', '4Hrs', '1Hrs')),
-          analysis         TEXT,
-          entry_price      REAL,
-          target_price     REAL,
-          stop_loss        REAL,
-          chart_path       TEXT,
-          execution_status TEXT CHECK(execution_status IN ('Pass', 'Fail', 'Partial', 'Cancelled', 'Waiting') OR execution_status IS NULL),
-          created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
-        );
-        INSERT INTO stock_plan_new SELECT id, symbol_id, stock_name, timeframe, analysis, entry_price, target_price, stop_loss, chart_path, execution_status, created_at, updated_at FROM stock_plan;
-        DROP TABLE stock_plan;
-        ALTER TABLE stock_plan_new RENAME TO stock_plan;
-      `);
-      database.pragma('foreign_keys = ON');
-    }
-  } catch (_) { /* stock_plan doesn't exist yet */ }
-
-  // Migrate stock_plan: add bias_tag column if missing, or update CHECK to include 'Range Bound'
-  try {
-    const spSql = database.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='stock_plan'").get();
-    if (spSql && !spSql.sql.includes('Range Bound')) {
+    const needsMigration = spSql && (!spSql.sql.includes("'4Hrs'") || !spSql.sql.includes('Range Bound'));
+    if (needsMigration) {
       const spCols = database.prepare("PRAGMA table_info(stock_plan)").all();
       const hasBiasTag = spCols.some(c => c.name === 'bias_tag');
       database.pragma('foreign_keys = OFF');
+      database.exec('DROP TABLE IF EXISTS stock_plan_migrated');
       database.exec(`
-        CREATE TABLE stock_plan_bias_new (
+        CREATE TABLE stock_plan_migrated (
           id               INTEGER PRIMARY KEY AUTOINCREMENT,
           symbol_id        INTEGER REFERENCES symbol(id),
           stock_name       TEXT NOT NULL,
@@ -212,24 +196,45 @@ function initializeDatabase() {
           created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
         );
-        INSERT INTO stock_plan_bias_new
+        INSERT INTO stock_plan_migrated
           SELECT id, symbol_id, stock_name, timeframe, analysis, entry_price, target_price, stop_loss, chart_path, execution_status,
                  ${hasBiasTag ? 'bias_tag' : 'NULL'}, created_at, updated_at
           FROM stock_plan;
         DROP TABLE stock_plan;
-        ALTER TABLE stock_plan_bias_new RENAME TO stock_plan;
+        ALTER TABLE stock_plan_migrated RENAME TO stock_plan;
         CREATE INDEX IF NOT EXISTS idx_stock_plan_stock_name ON stock_plan(stock_name);
         CREATE INDEX IF NOT EXISTS idx_stock_plan_execution_status ON stock_plan(execution_status);
       `);
       database.pragma('foreign_keys = ON');
     }
-  } catch (_) {}
+  } catch (e) {
+    console.error('stock_plan migration failed:', e);
+    database.pragma('foreign_keys = ON');
+  }
+
+  // Migrate stock_plan: add plan_date column for user-facing plan date
+  try {
+    const spCols = database.prepare("PRAGMA table_info(stock_plan)").all();
+    if (spCols.length > 0 && !spCols.some(c => c.name === 'plan_date')) {
+      database.exec("ALTER TABLE stock_plan ADD COLUMN plan_date TEXT");
+      database.exec("UPDATE stock_plan SET plan_date = DATE(created_at) WHERE plan_date IS NULL");
+    }
+  } catch (_) { /* table doesn't exist yet */ }
+
+  // Migrate stock_plan: default NULL execution_status to 'Waiting'
+  try {
+    const spCols = database.prepare("PRAGMA table_info(stock_plan)").all();
+    if (spCols.length > 0) {
+      database.exec("UPDATE stock_plan SET execution_status = 'Waiting' WHERE execution_status IS NULL");
+    }
+  } catch (_) { /* table doesn't exist yet */ }
 
   // Migrate custom_plan: update bias_tag CHECK to include 'Range Bound' (replaces Neutral)
   try {
     const cpSql = database.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='custom_plan'").get();
     if (cpSql && !cpSql.sql.includes('Range Bound')) {
       database.pragma('foreign_keys = OFF');
+      database.exec('DROP TABLE IF EXISTS custom_plan_bias_new');
       database.exec(`
         CREATE TABLE custom_plan_bias_new (
           id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -254,7 +259,10 @@ function initializeDatabase() {
       `);
       database.pragma('foreign_keys = ON');
     }
-  } catch (_) {}
+  } catch (e) {
+    console.error('custom_plan migration failed:', e);
+    database.pragma('foreign_keys = ON');
+  }
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS symbol (
@@ -334,6 +342,7 @@ function initializeDatabase() {
       chart_path       TEXT,
       execution_status TEXT CHECK(execution_status IN ('Pass', 'Fail', 'Partial', 'Cancelled', 'Waiting') OR execution_status IS NULL),
       bias_tag         TEXT CHECK(bias_tag IN ('Super Bullish','Bullish','Range Bound','Bearish','Super Bearish') OR bias_tag IS NULL),
+      plan_date        TEXT,
       created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
     );

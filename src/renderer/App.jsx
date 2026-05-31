@@ -304,7 +304,7 @@ function AppContent() {
 
       {/* Notification */}
       {notification && (
-        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg shadow-lg border animate-slide-up ${
+        <div className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 px-6 py-3 rounded-lg shadow-lg border animate-slide-up ${
           notification.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' :
           notification.type === 'error'   ? 'bg-red-500/20 border-red-500/30 text-red-400' :
                                             'bg-primary-500/20 border-primary-500/30 text-primary-400'
