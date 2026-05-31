@@ -81,10 +81,11 @@ export default function BackupView() {
           s.screenshots   && `${s.screenshots} images`,
         ].filter(Boolean);
         const summary = parts.length
-          ? `Imported: ${parts.join(', ')}.`
+          ? `Imported: ${parts.join(', ')}. Reloading app…`
           : 'Nothing new to import — all records already exist.';
         setRestoreStatus({ type: 'success', message: summary });
         showNotification('Restore complete', 'success');
+        if (parts.length) setTimeout(() => window.location.reload(), 2000);
       } else {
         setRestoreStatus({ type: 'error', message: result.error || 'Restore failed.' });
       }

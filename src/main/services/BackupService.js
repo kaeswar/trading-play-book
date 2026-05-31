@@ -124,11 +124,13 @@ function exportBackup(db, userData) {
     stock_name:       sp.stock_name,
     symbol_name:      sp.sym_name || null,
     timeframe:        sp.timeframe,
+    bias_tag:         sp.bias_tag,
     analysis:         sp.analysis,
     entry_price:      sp.entry_price,
     target_price:     sp.target_price,
     stop_loss:        sp.stop_loss,
     execution_status: sp.execution_status,
+    plan_date:        sp.plan_date,
     created_at:       sp.created_at,
     updated_at:       sp.updated_at,
     chart:            readImage(sp.chart_path, userData),
@@ -284,8 +286,8 @@ function importBackup(db, userData, filePath) {
         const symbolId = sp.symbol_name ? (symbolMap[sp.symbol_name] || null) : null;
         const chartPath = sp.chart ? img(sp.chart, 'swing') : null;
         db.prepare(
-          'INSERT INTO stock_plan (stock_name, symbol_id, timeframe, analysis, entry_price, target_price, stop_loss, chart_path, execution_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        ).run(sp.stock_name, symbolId, sp.timeframe, sp.analysis, sp.entry_price, sp.target_price, sp.stop_loss, chartPath, sp.execution_status, sp.created_at || now, sp.updated_at || now);
+          'INSERT INTO stock_plan (stock_name, symbol_id, timeframe, bias_tag, analysis, entry_price, target_price, stop_loss, chart_path, execution_status, plan_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(sp.stock_name, symbolId, sp.timeframe, sp.bias_tag || null, sp.analysis, sp.entry_price, sp.target_price, sp.stop_loss, chartPath, sp.execution_status || 'Waiting', sp.plan_date || null, sp.created_at || now, sp.updated_at || now);
         stats.stockPlans++;
       }
     }
