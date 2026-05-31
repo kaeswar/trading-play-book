@@ -447,6 +447,25 @@ function PlansTab({ day, customPlans, noteCounts, showPlannedOnly, setShowPlanne
             </div>
           )}
 
+          {customPlans.some(cp => cp.bias_tag === 'Range Bound') && (
+            <div className="mb-5">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-1.5 w-1.5 rounded-full bg-amber-500"></div>
+                <span className="text-xs font-semibold uppercase tracking-wider text-amber-400">Range Bound</span>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {customPlans.filter(cp => cp.bias_tag === 'Range Bound').map(plan => (
+                  <CustomPlanCard
+                    key={plan.id}
+                    plan={plan}
+                    noteCount={noteCounts.customPlanCounts[plan.id] || 0}
+                    onClick={() => onSelectPlan(plan, 'custom')}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {customPlans.some(cp => !cp.bias_tag) && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {customPlans.filter(cp => !cp.bias_tag).map(plan => (

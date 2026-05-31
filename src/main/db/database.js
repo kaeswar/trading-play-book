@@ -49,7 +49,7 @@ function initializeDatabase() {
           trading_day_id  INTEGER NOT NULL REFERENCES trading_day(id) ON DELETE CASCADE,
           title           TEXT NOT NULL DEFAULT '',
           trade_plan      TEXT NOT NULL DEFAULT '',
-          bias_tag        TEXT CHECK(bias_tag IN ('Super Bullish','Bullish','Neutral','Bearish','Super Bearish') OR bias_tag IS NULL),
+          bias_tag        TEXT CHECK(bias_tag IN ('Super Bullish','Bullish','Range Bound','Bearish','Super Bearish') OR bias_tag IS NULL),
           target          REAL,
           stop_out        REAL,
           verdict_status  TEXT CHECK(verdict_status IN ('Pass', 'Fail', 'Partial', 'Cancelled') OR verdict_status IS NULL),
@@ -189,11 +189,70 @@ function initializeDatabase() {
     }
   } catch (_) { /* stock_plan doesn't exist yet */ }
 
-  // Migrate stock_plan: add bias_tag column
+  // Migrate stock_plan: add bias_tag column if missing, or update CHECK to include 'Range Bound'
   try {
-    const spCols = database.prepare("PRAGMA table_info(stock_plan)").all();
-    if (spCols.length && !spCols.find(c => c.name === 'bias_tag')) {
-      database.exec("ALTER TABLE stock_plan ADD COLUMN bias_tag TEXT CHECK(bias_tag IN ('Super Bullish','Bullish','Bearish','Super Bearish') OR bias_tag IS NULL)");
+    const spSql = database.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='stock_plan'").get();
+    if (spSql && !spSql.sql.includes('Range Bound')) {
+      const spCols = database.prepare("PRAGMA table_info(stock_plan)").all();
+      const hasBiasTag = spCols.some(c => c.name === 'bias_tag');
+      database.pragma('foreign_keys = OFF');
+      database.exec(`
+        CREATE TABLE stock_plan_bias_new (
+          id               INTEGER PRIMARY KEY AUTOINCREMENT,
+          symbol_id        INTEGER REFERENCES symbol(id),
+          stock_name       TEXT NOT NULL,
+          timeframe        TEXT NOT NULL CHECK(timeframe IN ('Monthly', 'Weekly', 'Daily', '4Hrs', '1Hrs')),
+          analysis         TEXT,
+          entry_price      REAL,
+          target_price     REAL,
+          stop_loss        REAL,
+          chart_path       TEXT,
+          execution_status TEXT CHECK(execution_status IN ('Pass', 'Fail', 'Partial', 'Cancelled', 'Waiting') OR execution_status IS NULL),
+          bias_tag         TEXT CHECK(bias_tag IN ('Super Bullish','Bullish','Range Bound','Bearish','Super Bearish') OR bias_tag IS NULL),
+          created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO stock_plan_bias_new
+          SELECT id, symbol_id, stock_name, timeframe, analysis, entry_price, target_price, stop_loss, chart_path, execution_status,
+                 ${hasBiasTag ? 'bias_tag' : 'NULL'}, created_at, updated_at
+          FROM stock_plan;
+        DROP TABLE stock_plan;
+        ALTER TABLE stock_plan_bias_new RENAME TO stock_plan;
+        CREATE INDEX IF NOT EXISTS idx_stock_plan_stock_name ON stock_plan(stock_name);
+        CREATE INDEX IF NOT EXISTS idx_stock_plan_execution_status ON stock_plan(execution_status);
+      `);
+      database.pragma('foreign_keys = ON');
+    }
+  } catch (_) {}
+
+  // Migrate custom_plan: update bias_tag CHECK to include 'Range Bound' (replaces Neutral)
+  try {
+    const cpSql = database.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='custom_plan'").get();
+    if (cpSql && !cpSql.sql.includes('Range Bound')) {
+      database.pragma('foreign_keys = OFF');
+      database.exec(`
+        CREATE TABLE custom_plan_bias_new (
+          id              INTEGER PRIMARY KEY AUTOINCREMENT,
+          trading_day_id  INTEGER NOT NULL REFERENCES trading_day(id) ON DELETE CASCADE,
+          title           TEXT NOT NULL DEFAULT '',
+          trade_plan      TEXT NOT NULL DEFAULT '',
+          bias_tag        TEXT CHECK(bias_tag IN ('Super Bullish','Bullish','Range Bound','Bearish','Super Bearish') OR bias_tag IS NULL),
+          target          REAL,
+          stop_out        REAL,
+          verdict_status  TEXT CHECK(verdict_status IN ('Pass', 'Fail', 'Partial', 'Cancelled') OR verdict_status IS NULL),
+          verdict_notes   TEXT,
+          created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO custom_plan_bias_new
+          SELECT id, trading_day_id, title, trade_plan,
+                 CASE WHEN bias_tag = 'Neutral' THEN NULL ELSE bias_tag END,
+                 target, stop_out, verdict_status, verdict_notes, created_at, updated_at
+          FROM custom_plan;
+        DROP TABLE custom_plan;
+        ALTER TABLE custom_plan_bias_new RENAME TO custom_plan;
+      `);
+      database.pragma('foreign_keys = ON');
     }
   } catch (_) {}
 
@@ -274,7 +333,7 @@ function initializeDatabase() {
       stop_loss        REAL,
       chart_path       TEXT,
       execution_status TEXT CHECK(execution_status IN ('Pass', 'Fail', 'Partial', 'Cancelled', 'Waiting') OR execution_status IS NULL),
-      bias_tag         TEXT CHECK(bias_tag IN ('Super Bullish','Bullish','Bearish','Super Bearish') OR bias_tag IS NULL),
+      bias_tag         TEXT CHECK(bias_tag IN ('Super Bullish','Bullish','Range Bound','Bearish','Super Bearish') OR bias_tag IS NULL),
       created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -287,7 +346,7 @@ function initializeDatabase() {
       trading_day_id  INTEGER NOT NULL REFERENCES trading_day(id) ON DELETE CASCADE,
       title           TEXT NOT NULL DEFAULT '',
       trade_plan      TEXT NOT NULL DEFAULT '',
-      bias_tag        TEXT CHECK(bias_tag IN ('Super Bullish','Bullish','Neutral','Bearish','Super Bearish') OR bias_tag IS NULL),
+      bias_tag        TEXT CHECK(bias_tag IN ('Super Bullish','Bullish','Range Bound','Bearish','Super Bearish') OR bias_tag IS NULL),
       target          REAL,
       stop_out        REAL,
       verdict_status  TEXT CHECK(verdict_status IN ('Pass', 'Fail', 'Partial', 'Cancelled') OR verdict_status IS NULL),
