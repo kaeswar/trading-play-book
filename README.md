@@ -82,8 +82,14 @@ Screenshots you attach are stored at their **original location** on your drive �
 
 If you find Trading Play Book useful, consider supporting its development:
 
-- Scan the donation QR code inside the app (Help → About)
+<p align="center">
+  <img src="donate_qr.png" alt="Donate via UPI" width="200"/>
+</p>
+
+<p align="center"><b>Scan to donate via UPI</b></p>
+
 - Every contribution is deeply appreciated
+- UPI donations also accepted inside the app (Help → About)
 
 ---
 
