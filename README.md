@@ -18,6 +18,10 @@ If you find Trading Play Book useful, consider supporting its development:
 
 <p align="center"><b>Scan to donate via UPI</b></p>
 
+<p align="center">
+  Or use UPI ID directly: <code>kaeswar@oksbi</code>
+</p>
+
 - Every contribution is deeply appreciated
 - UPI donations also accepted inside the app (Help → About)
 
@@ -44,21 +48,21 @@ Go to the [**Releases**](../../releases/latest) page and download one of:
 
 | File | When to use |
 |------|-------------|
-| `Trading Play Book Setup 1.2.0.exe` | **Recommended** — installs the app, creates Start Menu & Desktop shortcuts |
-| `Trading Play Book 1.2.0.exe` | **Portable** — run directly without installing, no admin rights needed |
+| `Trading Play Book Setup 1.3.0.exe` | **Recommended** — installs the app, creates Start Menu & Desktop shortcuts |
+| `Trading Play Book 1.3.0.exe` | **Portable** — run directly without installing, no admin rights needed |
 
 ---
 
 ## Installation
 
 ### Installer (recommended)
-1. Download `Trading Play Book Setup 1.2.0.exe`
+1. Download `Trading Play Book Setup 1.3.0.exe`
 2. Run the installer — Windows may show a SmartScreen warning (see note below)
 3. Choose your install folder (default: `C:\Program Files\Trading Play Book`)
 4. Launch from the Desktop shortcut or Start Menu
 
 ### Portable
-1. Download `Trading Play Book 1.2.0.exe`
+1. Download `Trading Play Book 1.3.0.exe`
 2. Place it in any folder you prefer
 3. Double-click to run — no installation needed
 
@@ -82,7 +86,7 @@ Screenshots you attach are stored at their **original location** on your drive �
 
 ---
 
-## Features — v1.1
+## Features — v1.3
 
 - **Default Basic Plans** — 6 Plan Profile opening scenarios with target, stop-out, and screenshots per outcome
 - **Custom Plans** — Create your own trade plans with bias tags, price levels, and per-plan verdicts
@@ -98,6 +102,13 @@ Screenshots you attach are stored at their **original location** on your drive �
 ---
 
 ## Release History
+
+### v1.3.0
+- Tamil language support (தமிழ்) — full bilingual UI across all views
+- Language toggle (EN | தமிழ்) in the sidebar, persisted across sessions
+- Bilingual User Guide with complete Tamil content for all 6 sections
+- About modal: UPI ID `kaeswar@oksbi` shown alongside QR code for donations
+- Version number auto-syncs from package.json on every build
 
 ### v1.2.0
 - Gallery: verdict tags on every day card (Verdict Pending for unreviewed days, custom plan Pass/Fail badges)
