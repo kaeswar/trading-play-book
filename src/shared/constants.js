@@ -85,6 +85,16 @@ export function formatDate(dateStr) {
   });
 }
 
+// Stock Plan bias tags
+export const STOCK_PLAN_BIAS_TAGS = ['Super Bullish', 'Bullish', 'Bearish', 'Super Bearish'];
+
+export const STOCK_PLAN_BIAS_COLORS = {
+  'Super Bullish': { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30' },
+  'Bullish':       { bg: 'bg-cyan-500/20',    text: 'text-cyan-400',    border: 'border-cyan-500/30' },
+  'Bearish':       { bg: 'bg-rose-500/20',    text: 'text-rose-400',    border: 'border-rose-500/30' },
+  'Super Bearish': { bg: 'bg-red-700/20',     text: 'text-red-300',     border: 'border-red-700/30' },
+};
+
 // Stock Plan constants
 export const EXECUTION_STATUSES = ['Pass', 'Fail', 'Partial', 'Cancelled', 'Waiting'];
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { EXECUTION_STATUS_COLORS, TIMEFRAME_COLORS } from '../../../shared/constants';
+import { EXECUTION_STATUS_COLORS, TIMEFRAME_COLORS, STOCK_PLAN_BIAS_COLORS } from '../../../shared/constants';
 
 export default function StockPlanCard({ plan, onClick, onDelete }) {
   const [chartSrc, setChartSrc] = useState(null);
@@ -18,6 +18,7 @@ export default function StockPlanCard({ plan, onClick, onDelete }) {
 
   const statusColor = plan.execution_status ? EXECUTION_STATUS_COLORS[plan.execution_status] : null;
   const tfColor = TIMEFRAME_COLORS[plan.timeframe];
+  const biasColor = plan.bias_tag ? STOCK_PLAN_BIAS_COLORS[plan.bias_tag] : null;
 
   const handleDelete = (e) => {
     e.stopPropagation();
@@ -52,6 +53,11 @@ export default function StockPlanCard({ plan, onClick, onDelete }) {
             <span className={`badge text-[10px] ${tfColor.bg} ${tfColor.text} border ${tfColor.border}`}>
               {plan.timeframe}
             </span>
+            {biasColor && (
+              <span className={`badge text-[10px] ${biasColor.bg} ${biasColor.text} border ${biasColor.border}`}>
+                {plan.bias_tag}
+              </span>
+            )}
             {statusColor && (
               <span className={`badge text-[10px] ${statusColor.bg} ${statusColor.text} border ${statusColor.border}`}>
                 {plan.execution_status}

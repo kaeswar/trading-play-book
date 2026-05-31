@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStockPlan } from '../../hooks/useStockPlan';
 import { useApp } from '../../store/appStore';
-import { TIMEFRAMES } from '../../../shared/constants';
+import { TIMEFRAMES, STOCK_PLAN_BIAS_TAGS, STOCK_PLAN_BIAS_COLORS } from '../../../shared/constants';
 
 export default function StockPlanForm({ onCreated, onCancel }) {
   const { createPlan, importChart } = useStockPlan();
@@ -9,6 +9,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
 
   const [symbolId, setSymbolId] = useState('');
   const [timeframe, setTimeframe] = useState('Weekly');
+  const [biasTag, setBiasTag] = useState('');
   const [analysis, setAnalysis] = useState('');
   const [entryPrice, setEntryPrice] = useState('');
   const [targetPrice, setTargetPrice] = useState('');
@@ -51,6 +52,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
         symbolId: selectedSymbol.id,
         stockName: selectedSymbol.name,
         timeframe,
+        biasTag: biasTag || null,
         analysis: analysis.trim(),
         entryPrice: entryPrice ? parseFloat(entryPrice) : null,
         targetPrice: targetPrice ? parseFloat(targetPrice) : null,
@@ -110,6 +112,31 @@ export default function StockPlanForm({ onCreated, onCancel }) {
                 <option key={tf} value={tf}>{tf}</option>
               ))}
             </select>
+          </div>
+        </div>
+
+        {/* Bias */}
+        <div>
+          <label className="block text-[10px] text-gray-500 mb-2 uppercase">Bias</label>
+          <div className="flex flex-wrap gap-2">
+            {STOCK_PLAN_BIAS_TAGS.map((tag) => {
+              const colors = STOCK_PLAN_BIAS_COLORS[tag];
+              const isActive = biasTag === tag;
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setBiasTag(isActive ? '' : tag)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                    isActive
+                      ? `${colors.bg} ${colors.text} ${colors.border}`
+                      : 'bg-surface-700 text-gray-400 border-surface-600 hover:border-surface-500'
+                  }`}
+                >
+                  {tag}
+                </button>
+              );
+            })}
           </div>
         </div>
 

@@ -189,6 +189,14 @@ function initializeDatabase() {
     }
   } catch (_) { /* stock_plan doesn't exist yet */ }
 
+  // Migrate stock_plan: add bias_tag column
+  try {
+    const spCols = database.prepare("PRAGMA table_info(stock_plan)").all();
+    if (spCols.length && !spCols.find(c => c.name === 'bias_tag')) {
+      database.exec("ALTER TABLE stock_plan ADD COLUMN bias_tag TEXT CHECK(bias_tag IN ('Super Bullish','Bullish','Bearish','Super Bearish') OR bias_tag IS NULL)");
+    }
+  } catch (_) {}
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS symbol (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -266,6 +274,7 @@ function initializeDatabase() {
       stop_loss        REAL,
       chart_path       TEXT,
       execution_status TEXT CHECK(execution_status IN ('Pass', 'Fail', 'Partial', 'Cancelled', 'Waiting') OR execution_status IS NULL),
+      bias_tag         TEXT CHECK(bias_tag IN ('Super Bullish','Bullish','Bearish','Super Bearish') OR bias_tag IS NULL),
       created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
     );

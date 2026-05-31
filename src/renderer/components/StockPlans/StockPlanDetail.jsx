@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStockPlan } from '../../hooks/useStockPlan';
 import { useApp } from '../../store/appStore';
-import { EXECUTION_STATUSES, EXECUTION_STATUS_COLORS, TIMEFRAMES, TIMEFRAME_COLORS, formatDate } from '../../../shared/constants';
+import { EXECUTION_STATUSES, EXECUTION_STATUS_COLORS, TIMEFRAMES, TIMEFRAME_COLORS, STOCK_PLAN_BIAS_TAGS, STOCK_PLAN_BIAS_COLORS, formatDate } from '../../../shared/constants';
 
 export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
   const { updatePlan, deletePlan, updateStatus, importChart } = useStockPlan();
@@ -16,6 +16,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
   const [symbolId, setSymbolId] = useState('');
   const [stockName, setStockName] = useState('');
   const [timeframe, setTimeframe] = useState('Weekly');
+  const [biasTag, setBiasTag] = useState('');
   const [analysis, setAnalysis] = useState('');
   const [entryPrice, setEntryPrice] = useState('');
   const [targetPrice, setTargetPrice] = useState('');
@@ -36,6 +37,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
         setSymbolId(data.symbol_id ? String(data.symbol_id) : '');
         setStockName(data.stock_name || '');
         setTimeframe(data.timeframe || 'Weekly');
+        setBiasTag(data.bias_tag || '');
         setAnalysis(data.analysis || '');
         setEntryPrice(data.entry_price != null ? String(data.entry_price) : '');
         setTargetPrice(data.target_price != null ? String(data.target_price) : '');
@@ -68,6 +70,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
         symbolId: selectedSymbol.id,
         stockName: selectedSymbol.name,
         timeframe,
+        biasTag: biasTag || null,
         analysis: analysis.trim(),
         entryPrice: entryPrice ? parseFloat(entryPrice) : null,
         targetPrice: targetPrice ? parseFloat(targetPrice) : null,
@@ -144,6 +147,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
 
   const statusColor = plan.execution_status ? EXECUTION_STATUS_COLORS[plan.execution_status] : null;
   const tfColor = TIMEFRAME_COLORS[plan.timeframe];
+  const biasColor = plan.bias_tag ? STOCK_PLAN_BIAS_COLORS[plan.bias_tag] : null;
 
   return (
     <div className="space-y-6">
@@ -155,6 +159,14 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
           </svg>
           <span className="text-sm">Back</span>
         </button>
+        <div className="flex items-center gap-2">
+          <span className="text-base font-semibold text-gray-200">{plan.stock_name}</span>
+          {biasColor && (
+            <span className={`badge text-[10px] ${biasColor.bg} ${biasColor.text} border ${biasColor.border}`}>
+              {plan.bias_tag}
+            </span>
+          )}
+        </div>
         {!readOnly && (
           <div className="flex items-center gap-2">
             {confirmDelete ? (
@@ -240,6 +252,31 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
                 <option key={tf} value={tf}>{tf}</option>
               ))}
             </select>
+          </div>
+        </div>
+
+        {/* Bias */}
+        <div>
+          <label className="block text-[10px] text-gray-500 mb-2 uppercase">Bias</label>
+          <div className="flex flex-wrap gap-2">
+            {STOCK_PLAN_BIAS_TAGS.map((tag) => {
+              const colors = STOCK_PLAN_BIAS_COLORS[tag];
+              const isActive = biasTag === tag;
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => { if (!readOnly) setBiasTag(isActive ? '' : tag); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                    isActive
+                      ? `${colors.bg} ${colors.text} ${colors.border}`
+                      : `bg-surface-700 text-gray-400 border-surface-600 ${readOnly ? 'cursor-default' : 'hover:border-surface-500'}`
+                  }`}
+                >
+                  {tag}
+                </button>
+              );
+            })}
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useStockPlan } from '../../hooks/useStockPlan';
-import { EXECUTION_STATUSES, TIMEFRAMES } from '../../../shared/constants';
+import { EXECUTION_STATUSES, TIMEFRAMES, STOCK_PLAN_BIAS_TAGS } from '../../../shared/constants';
 import StockPlanCard from './StockPlanCard';
 import StockPlanDetail from './StockPlanDetail';
 
@@ -12,6 +12,7 @@ export default function StockPlanGallery() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [timeframeFilter, setTimeframeFilter] = useState('');
+  const [biasFilter, setBiasFilter] = useState('');
   const [selectedPlanId, setSelectedPlanId] = useState(null);
 
   const loadPlans = useCallback(async () => {
@@ -20,10 +21,11 @@ export default function StockPlanGallery() {
       query: searchQuery,
       executionStatus: statusFilter || undefined,
       timeframe: timeframeFilter || undefined,
+      biasTag: biasFilter || undefined,
     });
     setPlans(results || []);
     setLoading(false);
-  }, [searchQuery, statusFilter, timeframeFilter]);
+  }, [searchQuery, statusFilter, timeframeFilter, biasFilter]);
 
   useEffect(() => { loadPlans(); }, [loadPlans]);
 
@@ -74,6 +76,17 @@ export default function StockPlanGallery() {
             <option value="">All Timeframes</option>
             {TIMEFRAMES.map((tf) => (
               <option key={tf} value={tf}>{tf}</option>
+            ))}
+          </select>
+
+          <select
+            value={biasFilter}
+            onChange={(e) => setBiasFilter(e.target.value)}
+            className="input-field text-sm w-auto"
+          >
+            <option value="">All Biases</option>
+            {STOCK_PLAN_BIAS_TAGS.map((b) => (
+              <option key={b} value={b}>{b}</option>
             ))}
           </select>
         </div>

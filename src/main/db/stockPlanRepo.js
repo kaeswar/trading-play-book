@@ -13,14 +13,15 @@ module.exports = {
     ).get(id);
   },
 
-  create({ symbolId, stockName, timeframe, analysis, entryPrice, targetPrice, stopLoss, chartPath }) {
+  create({ symbolId, stockName, timeframe, biasTag, analysis, entryPrice, targetPrice, stopLoss, chartPath }) {
     const result = getDb().prepare(
-      `INSERT INTO stock_plan (symbol_id, stock_name, timeframe, analysis, entry_price, target_price, stop_loss, chart_path)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO stock_plan (symbol_id, stock_name, timeframe, bias_tag, analysis, entry_price, target_price, stop_loss, chart_path)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       symbolId ?? null,
       stockName,
       timeframe,
+      biasTag || null,
       analysis || null,
       entryPrice ?? null,
       targetPrice ?? null,
@@ -30,10 +31,10 @@ module.exports = {
     return this.getById(result.lastInsertRowid);
   },
 
-  update(id, { symbolId, stockName, timeframe, analysis, entryPrice, targetPrice, stopLoss, chartPath }) {
+  update(id, { symbolId, stockName, timeframe, biasTag, analysis, entryPrice, targetPrice, stopLoss, chartPath }) {
     getDb().prepare(
       `UPDATE stock_plan
-       SET symbol_id = ?, stock_name = ?, timeframe = ?, analysis = ?,
+       SET symbol_id = ?, stock_name = ?, timeframe = ?, bias_tag = ?, analysis = ?,
            entry_price = ?, target_price = ?, stop_loss = ?,
            chart_path = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`
@@ -41,6 +42,7 @@ module.exports = {
       symbolId ?? null,
       stockName,
       timeframe,
+      biasTag || null,
       analysis || null,
       entryPrice ?? null,
       targetPrice ?? null,
@@ -70,7 +72,7 @@ module.exports = {
     return getDb().prepare('DELETE FROM stock_plan WHERE id = ?').run(id);
   },
 
-  search({ query, executionStatus, timeframe, activeOnly }) {
+  search({ query, executionStatus, timeframe, biasTag, activeOnly }) {
     let sql = 'SELECT * FROM stock_plan WHERE 1=1';
     const params = [];
 
@@ -90,6 +92,11 @@ module.exports = {
     if (timeframe) {
       sql += ' AND timeframe = ?';
       params.push(timeframe);
+    }
+
+    if (biasTag) {
+      sql += ' AND bias_tag = ?';
+      params.push(biasTag);
     }
 
     sql += ' ORDER BY updated_at DESC';
