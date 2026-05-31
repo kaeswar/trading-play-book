@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../store/appStore';
+import { useLanguage } from '../../hooks/useLanguage';
 import {
   ComposedChart, Bar, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -67,16 +68,17 @@ function Empty({ msg }) {
 
 // ── Custom tooltips ───────────────────────────────────────────────────────────
 function MonthTooltip({ active, payload, label }) {
+  const { t } = useLanguage();
   if (!active || !payload?.length) return null;
   return (
     <div style={TT} className="text-xs space-y-1 min-w-[140px]">
       <p className="font-semibold text-gray-200 mb-1.5">{label}</p>
       {payload.map((p) => (
-        <div key={p.name} className="flex items-center gap-2">
+        <div key={p.dataKey} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
           <span className="text-gray-400">{p.name}:</span>
           <span className="text-gray-200 font-medium ml-auto pl-2">
-            {p.name === 'Plan Rate' ? `${p.value}%` : p.value}
+            {p.dataKey === 'planRate' ? `${p.value}%` : p.value}
           </span>
         </div>
       ))}
@@ -85,11 +87,12 @@ function MonthTooltip({ active, payload, label }) {
 }
 
 function DonutTooltip({ active, payload }) {
+  const { t } = useLanguage();
   if (!active || !payload?.length) return null;
   return (
     <div style={TT} className="text-xs">
       <span className="text-gray-400">{payload[0].name}: </span>
-      <span className="text-gray-200 font-semibold">{payload[0].value} days</span>
+      <span className="text-gray-200 font-semibold">{payload[0].value} {t('daysUnit')}</span>
     </div>
   );
 }
@@ -97,6 +100,7 @@ function DonutTooltip({ active, payload }) {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function IntradayReport() {
   const { symbols } = useApp();
+  const { t } = useLanguage();
   const [symbolId, setSymbolId] = useState(null);
   const [data, setData]         = useState(null);
   const [loading, setLoading]   = useState(true);
@@ -131,15 +135,15 @@ export default function IntradayReport() {
   const successRate = pct(bd.accepted, (bd.accepted || 0) + (bd.rejected || 0));
 
   const donutSlices = [
-    { name: 'Accepted',   value: bd.accepted  || 0, color: C.accepted  },
-    { name: 'Rejected',   value: bd.rejected  || 0, color: C.rejected  },
-    { name: 'No Plan',    value: bd.noPlan    || 0, color: C.noPlan    },
-    { name: 'No Verdict', value: bd.noVerdict || 0, color: C.noVerdict },
+    { name: t('accepted'),  value: bd.accepted  || 0, color: C.accepted  },
+    { name: t('rejected'),  value: bd.rejected  || 0, color: C.rejected  },
+    { name: t('noPlan'),    value: bd.noPlan    || 0, color: C.noPlan    },
+    { name: t('noVerdict'), value: bd.noVerdict || 0, color: C.noVerdict },
   ].filter((s) => s.value > 0);
 
   const xInterval = monthly.length > 12 ? Math.floor(monthly.length / 10) : 0;
 
-  if (loading) return <div className="flex items-center justify-center py-32 text-gray-500 text-sm">Loading report…</div>;
+  if (loading) return <div className="flex items-center justify-center py-32 text-gray-500 text-sm">{t('loadingReport')}</div>;
   if (error)   return <div className="flex items-center justify-center py-32 text-red-400 text-sm">{error}</div>;
 
   return (
@@ -147,20 +151,20 @@ export default function IntradayReport() {
 
       {/* Symbol filter */}
       <div className="flex items-center justify-end gap-2">
-        <span className="text-xs text-gray-500">Symbol</span>
+        <span className="text-xs text-gray-500">{t('symbol')}</span>
         <select
           value={symbolId || ''}
           onChange={(e) => setSymbolId(e.target.value ? Number(e.target.value) : null)}
           className="input-field text-xs py-1 w-auto"
         >
-          <option value="">All Symbols</option>
+          <option value="">{t('allSymbols')}</option>
           {symbols.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </div>
 
       {/* ── Chart 1: Monthly Activity ── */}
       <div className="glass-card p-5">
-        <h4 className="text-sm font-semibold text-gray-200">Monthly Activity &amp; Discipline</h4>
+        <h4 className="text-sm font-semibold text-gray-200">{t('monthlyActivity')}</h4>
         <ChartQuestion text='"Am I showing up prepared, and is it improving over time?"' />
         {monthly.length === 0
           ? <Empty msg="No trading days logged yet" />
@@ -173,9 +177,9 @@ export default function IntradayReport() {
                 <YAxis yAxisId="right" orientation="right" tick={{ fill: C.planRate, fontSize: 11 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} />
                 <Tooltip content={<MonthTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
                 <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} formatter={(v) => <span style={{ color: '#9ca3af' }}>{v}</span>} />
-                <Bar yAxisId="left" dataKey="totalDays"   name="Total Days"     fill={C.total}   radius={[3,3,0,0]} maxBarSize={28} />
-                <Bar yAxisId="left" dataKey="plannedDays" name="Days with Plan" fill={C.planned} radius={[3,3,0,0]} maxBarSize={28} />
-                <Line yAxisId="right" type="monotone" dataKey="planRate" name="Plan Rate" stroke={C.planRate} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                <Bar yAxisId="left" dataKey="totalDays"   name={t('totalDaysBar')}  fill={C.total}   radius={[3,3,0,0]} maxBarSize={28} />
+                <Bar yAxisId="left" dataKey="plannedDays" name={t('daysWithPlan')}  fill={C.planned} radius={[3,3,0,0]} maxBarSize={28} />
+                <Line yAxisId="right" type="monotone" dataKey="planRate" name={t('planRateLine')} stroke={C.planRate} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
               </ComposedChart>
             </ResponsiveContainer>
           )
@@ -187,7 +191,7 @@ export default function IntradayReport() {
 
         {/* Donut with CSS-overlay center label */}
         <div className="col-span-2 glass-card p-5">
-          <h4 className="text-sm font-semibold text-gray-200">Verdict Outcome Breakdown</h4>
+          <h4 className="text-sm font-semibold text-gray-200">{t('verdictBreakdown')}</h4>
           <ChartQuestion text='"What is my actual win rate across all logged days?"' />
           {donutSlices.length === 0
             ? <Empty msg="No verdicts recorded yet" />
@@ -206,7 +210,7 @@ export default function IntradayReport() {
                 <div className="absolute top-0 left-0 right-0 flex justify-center" style={{ top: '20%', pointerEvents: 'none' }}>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-gray-100">{totalDays}</div>
-                    <div className="text-xs text-gray-500">days</div>
+                    <div className="text-xs text-gray-500">{t('daysUnit')}</div>
                   </div>
                 </div>
               </div>
@@ -217,18 +221,18 @@ export default function IntradayReport() {
         {/* KPI cards */}
         <div className="col-span-3 grid grid-rows-3 gap-4">
           <KPICard
-            label="Total Days Logged"
+            label={t('totalDaysLogged')}
             value={totalDays}
             sub="trading days recorded in the journal"
           />
           <KPICard
-            label="Preparation Rate"
+            label={t('preparationRate')}
             value={`${prepRate}%`}
             sub="of reviewed days had a prepared plan"
             color={prepRate >= 70 ? 'text-emerald-400' : prepRate >= 40 ? 'text-amber-400' : 'text-red-400'}
           />
           <KPICard
-            label="Plan Success Rate"
+            label={t('planSuccessRate')}
             value={`${successRate}%`}
             sub="of planned days the market accepted the scenario"
             color={successRate >= 60 ? 'text-emerald-400' : successRate >= 40 ? 'text-amber-400' : 'text-red-400'}

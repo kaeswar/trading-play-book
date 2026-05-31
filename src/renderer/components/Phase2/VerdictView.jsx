@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../store/appStore';
+import { useLanguage } from '../../hooks/useLanguage';
 import { useTradingDay } from '../../hooks/useTradingDay';
 import { useVerdict } from '../../hooks/useVerdict';
 import { POSSIBILITIES, OUTCOMES, BIAS_COLORS, OUTCOME_COLORS, CUSTOM_VERDICT_STATUSES, CUSTOM_VERDICT_COLORS, BEHAVIOR_TAGS, getOutcomeColors, formatPossibilityCode, formatDate } from '../../../shared/constants';
@@ -8,6 +9,7 @@ import VerdictForm from './VerdictForm';
 
 export default function VerdictView() {
   const { selectedSymbol, selectedDate, showNotification } = useApp();
+  const { t } = useLanguage();
   const { createOrGetTradingDay, getTradingDayDetails } = useTradingDay();
   const { saveVerdict, getVerdict, getVerdictScreenshots, saveVerdictScreenshots } = useVerdict();
 
@@ -123,15 +125,15 @@ export default function VerdictView() {
           <div className="flex items-center gap-3">
             <div className="w-1 h-10 rounded-full bg-gradient-to-b from-primary-400 to-primary-600 flex-shrink-0"></div>
             <div>
-              <h3 className="text-base font-semibold text-gray-100">Default Plan Verdict</h3>
+              <h3 className="text-base font-semibold text-gray-100">{t('defaultPlanVerdict')}</h3>
               <p className="text-[10px] text-gray-500 mt-0.5">
-                {selectedSymbol.name} &middot; {formatDate(selectedDate)} &middot; Opening scenario outcome
+                {selectedSymbol.name} &middot; {formatDate(selectedDate)} &middot; {t('openingScenario')}
               </p>
             </div>
           </div>
           {verdict && !showForm && (
             <button onClick={() => setShowForm(true)} className="btn-secondary text-sm">
-              Edit Verdict
+              {t('editVerdict')}
             </button>
           )}
         </div>
@@ -159,9 +161,9 @@ export default function VerdictView() {
           <div className="flex items-center gap-3 mb-4 pt-4 border-t border-surface-600/50">
             <div className="w-1 h-10 rounded-full bg-gradient-to-b from-purple-500 to-fuchsia-500 flex-shrink-0"></div>
             <div>
-              <h3 className="text-base font-semibold text-gray-100">Custom Plan Verdict</h3>
+              <h3 className="text-base font-semibold text-gray-100">{t('customPlanVerdict')}</h3>
               <p className="text-[10px] text-gray-500 mt-0.5">
-                {customPlans.length} custom plan{customPlans.length > 1 ? 's' : ''} &middot; Mark each plan's result
+                {customPlans.length} custom plan{customPlans.length > 1 ? 's' : ''} &middot; {t('markEachPlan')}
               </p>
             </div>
           </div>
@@ -332,6 +334,7 @@ function VerdictScreenshotThumb({ filePath, onClick }) {
 
 function CustomPlanVerdictCard({ plan, onVerdictUpdate }) {
   const { saveCustomPlanVerdict } = useCustomPlan();
+  const { t } = useLanguage();
   const [verdictStatus, setVerdictStatus] = useState(plan.verdict_status || null);
   const [verdictNotes, setVerdictNotes] = useState(plan.verdict_notes || '');
   const [editingNotes, setEditingNotes] = useState(false);
@@ -410,7 +413,7 @@ function CustomPlanVerdictCard({ plan, onVerdictUpdate }) {
                       : 'bg-surface-800 border-surface-600 text-gray-400 hover:border-surface-500'
                   }`}
                 >
-                  {status}
+                  {t(status.toLowerCase())}
                 </button>
               );
             })}
@@ -433,7 +436,7 @@ function CustomPlanVerdictCard({ plan, onVerdictUpdate }) {
                   onClick={handleNotesSave}
                   className="self-end text-xs px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg transition-colors"
                 >
-                  Save
+                  {t('save')}
                 </button>
               </div>
             ) : (

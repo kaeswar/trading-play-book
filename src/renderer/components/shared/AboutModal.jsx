@@ -1,6 +1,21 @@
 import React from 'react';
+import { useLanguage } from '../../hooks/useLanguage';
+
+/* global __APP_VERSION__ */
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.2.0';
 
 export default function AboutModal({ onClose }) {
+  const { t } = useLanguage();
+
+  const features = [
+    { icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', textKey: 'featureDefaultPlans' },
+    { icon: 'M12 4v16m8-8H4',                                                                                                                      textKey: 'featureCustomPlans'  },
+    { icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',                                                                                      textKey: 'featurePostMarket'   },
+    { icon: 'M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z',                                                    textKey: 'featurePlanAnalysis' },
+    { icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14',                                                     textKey: 'featureGallery'      },
+    { icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',                                                                                                     textKey: 'featureSwingPlans'   },
+  ];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
@@ -18,9 +33,9 @@ export default function AboutModal({ onClose }) {
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold text-white">Trading Play Book</h2>
-                <span className="text-[10px] font-semibold bg-white/20 text-white px-2 py-0.5 rounded-full">v1.0</span>
+                <span className="text-[10px] font-semibold bg-white/20 text-white px-2 py-0.5 rounded-full">v{APP_VERSION}</span>
               </div>
-              <p className="text-xs text-white/70">Plan Profile · Free to use</p>
+              <p className="text-xs text-white/70">{t('aboutSubtitle')}</p>
             </div>
           </div>
         </div>
@@ -29,11 +44,7 @@ export default function AboutModal({ onClose }) {
         <div className="px-6 py-5 space-y-4 overflow-y-auto">
 
           {/* About */}
-          <p className="text-sm text-gray-300 leading-relaxed">
-            A purpose-built desktop journal for traders who follow a disciplined, process-driven approach.
-            It bridges pre-market planning with post-market review — building consistency and self-awareness
-            in every trading decision.
-          </p>
+          <p className="text-sm text-gray-300 leading-relaxed">{t('aboutDescription')}</p>
 
           {/* Donationware notice */}
           <div className="p-4 rounded-lg border border-primary-500/30 bg-primary-500/5">
@@ -44,41 +55,41 @@ export default function AboutModal({ onClose }) {
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-semibold text-primary-300 mb-0.5">This app is Donationware</p>
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  Free to download and use forever. If it adds value to your trading journey,
-                  a small donation helps keep this project alive and growing.
-                </p>
+                <p className="text-sm font-semibold text-primary-300 mb-0.5">{t('donationwareTitle')}</p>
+                <p className="text-xs text-gray-400 leading-relaxed">{t('donationwareDesc')}</p>
               </div>
             </div>
           </div>
 
           {/* Donate QR */}
           <div className="p-4 bg-surface-700/50 rounded-lg text-center">
-            <p className="text-xs text-gray-400 mb-3">Scan to support the project</p>
+            <p className="text-xs text-gray-400 mb-3">{t('scanToSupport')}</p>
             <img
               src="/donate_qr.png"
               alt="Donate QR Code"
               className="w-36 h-36 mx-auto rounded-lg border border-surface-500/60"
             />
-            <p className="text-[11px] text-gray-500 mt-2">Every contribution is deeply appreciated 🙏</p>
+            <div className="mt-3 flex items-center gap-2 justify-center">
+              <span className="text-[11px] text-gray-500">{t('orUpiId')}:</span>
+              <code className="text-[11px] font-mono text-primary-400 bg-surface-700 px-2 py-0.5 rounded select-all">
+                kaeswar@oksbi
+              </code>
+            </div>
+            <p className="text-[11px] text-gray-500 mt-2">{t('appreciatedMsg')}</p>
           </div>
 
           {/* Features */}
           <div className="p-3 bg-surface-700/50 rounded-lg space-y-2">
-            <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">What's inside v1.0</p>
-            <FeatureItem icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" text="Default Basic Plans — 6 Plan Profile opening scenarios with target, stop-out, and screenshots" />
-            <FeatureItem icon="M12 4v16m8-8H4" text="Custom Plans — create your own trade plans with bias tags, price levels, and per-plan verdicts" />
-            <FeatureItem icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" text="Post-Market Verdict — record what actually happened and review plan effectiveness" />
-            <FeatureItem icon="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" text="Plan Analysis — behaviour tag mapping across all plans with date navigation" />
-            <FeatureItem icon="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" text="Gallery & Metrics — filterable history, performance dashboard, and screenshot viewer" />
-            <FeatureItem icon="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" text="Stock Swing Plans — standalone module for stock-level trade planning with execution tracking" />
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">{t('whatsInside')} v{APP_VERSION}</p>
+            {features.map(({ icon, textKey }) => (
+              <FeatureItem key={textKey} icon={icon} text={t(textKey)} />
+            ))}
           </div>
 
           {/* Author */}
           <div className="p-3 bg-surface-700/50 rounded-lg flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Author</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">{t('authorLabel')}</p>
               <p className="text-sm text-gray-200 font-medium">Kaeswar</p>
               <a href="mailto:kaeswar@gmail.com" className="text-xs text-primary-400 hover:text-primary-300 transition-colors">
                 kaeswar@gmail.com
@@ -96,11 +107,11 @@ export default function AboutModal({ onClose }) {
         {/* Footer */}
         <div className="px-6 py-3 border-t border-surface-600/50 flex items-center justify-between">
           <div>
-            <p className="text-xs text-gray-500 font-medium">Version 1.0.0</p>
-            <p className="text-[10px] text-gray-600">Donationware — free forever</p>
+            <p className="text-xs text-gray-500 font-medium">{t('versionFooter')} {APP_VERSION}</p>
+            <p className="text-[10px] text-gray-600">{t('freeForever')}</p>
           </div>
           <button onClick={onClose} className="btn-primary text-sm px-5 py-2">
-            Close
+            {t('close')}
           </button>
         </div>
       </div>

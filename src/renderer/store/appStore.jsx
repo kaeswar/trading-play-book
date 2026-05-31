@@ -16,6 +16,13 @@ export function AppProvider({ children }) {
   const [savingDayPlan, setSavingDayPlan] = useState(false);
   const [refreshDatesFn, setRefreshDatesFn] = useState(null);
   const [showNoPlan, setShowNoPlan] = useState(false);
+  const [language, setLanguageState] = useState(() => localStorage.getItem('tpb-language') || 'en');
+
+  const setLanguage = (lang) => {
+    localStorage.setItem('tpb-language', lang);
+    setLanguageState(lang);
+  };
+
   const [galleryFilters, setGalleryFilters] = useState(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -65,6 +72,8 @@ export function AppProvider({ children }) {
     setShowNoPlan,
     galleryFilters,
     setGalleryFilters,
+    language,
+    setLanguage,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

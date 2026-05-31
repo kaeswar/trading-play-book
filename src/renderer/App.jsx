@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './store/appStore.jsx';
+import { useLanguage } from './hooks/useLanguage';
 import PlanningView from './components/Phase1/PlanningView';
 import VerdictView from './components/Phase2/VerdictView';
 import GalleryView from './components/Phase3/GalleryView';
@@ -9,6 +10,7 @@ import SettingsView from './components/Settings/SettingsView';
 import IntradayReport from './components/Reports/IntradayReport';
 import SwingReport from './components/Reports/SwingReport';
 import AboutModal from './components/shared/AboutModal';
+import UserGuideModal from './components/shared/UserGuideModal';
 import StyledDatePicker from './components/shared/StyledDatePicker';
 
 const SETTINGS_TREE = [
@@ -35,19 +37,19 @@ const SETTINGS_TREE = [
 ];
 
 const INTRADAY_NAV = [
-  { id: 'planning',   label: 'Pre-Market Plan', sub: 'Create / Edit plans',      icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
-  { id: 'verdict',    label: 'Post-Market',      sub: "Update Plan's Result",     icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
-  { id: 'gallery',    label: 'Gallery',           sub: 'View / Delete Plan',      icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
+  { id: 'planning',   labelKey: 'preMarket',  subKey: 'subCreateEdit',      icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
+  { id: 'verdict',    labelKey: 'postMarket', subKey: 'subUpdateResult',    icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
+  { id: 'gallery',    labelKey: 'gallery',    subKey: 'subViewDelete',      icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
 ];
 
 const SWING_NAV = [
-  { id: 'swingPlans',   label: 'Plans',   sub: 'Create / Edit / Update Result', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-  { id: 'swingGallery', label: 'Gallery', sub: 'View / Delete Plan',            icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
+  { id: 'swingPlans',   labelKey: 'swingPlans',   subKey: 'subCreateEditUpdate', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+  { id: 'swingGallery', labelKey: 'swingGallery', subKey: 'subViewDelete',      icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
 ];
 
 const REPORTS_NAV = [
-  { id: 'reportIntraday', label: 'Intraday',    icon: 'M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
-  { id: 'reportSwing',    label: 'Swing Plans', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
+  { id: 'reportIntraday', labelKey: 'reportIntraday', icon: 'M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
+  { id: 'reportSwing',    labelKey: 'reportSwing',    icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
 ];
 
 const PAGE_META = {
@@ -63,7 +65,7 @@ const PAGE_META = {
 
 const INTRADAY_VIEWS = new Set(['planning', 'verdict', 'gallery']);
 
-function NavButton({ item, currentView, onClick }) {
+function NavButton({ item, currentView, onClick, t }) {
   const active = currentView === item.id;
   return (
     <button
@@ -78,17 +80,17 @@ function NavButton({ item, currentView, onClick }) {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
       </svg>
       <div className="flex flex-col items-start">
-        <span>{item.label}</span>
-        {item.sub && <span className="text-[10px] font-normal text-gray-500 leading-tight">{item.sub}</span>}
+        <span>{t(item.labelKey)}</span>
+        {item.subKey && <span className="text-[10px] font-normal text-gray-500 leading-tight">{t(item.subKey)}</span>}
       </div>
     </button>
   );
 }
 
-function SectionLabel({ label }) {
+function SectionLabel({ labelKey, t }) {
   return (
     <div className="px-3 pt-4 pb-1">
-      <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">{label}</span>
+      <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">{t(labelKey)}</span>
     </div>
   );
 }
@@ -100,8 +102,15 @@ function AppContent() {
     selectedDate, setSelectedDate,
     saveDayPlanFn, savingDayPlan, setRefreshDatesFn,
   } = useApp();
+  const { t, language, setLanguage } = useLanguage();
 
   const [showAbout, setShowAbout] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+
+  useEffect(() => {
+    window.api.on('menu:open-about', () => setShowAbout(true));
+    window.api.on('menu:open-guide', () => setShowGuide(true));
+  }, []);
   const [availableDates, setAvailableDates] = useState([]);
   const [settingsSelected, setSettingsSelected] = useState('dayPlan');
 
@@ -151,25 +160,25 @@ function AppContent() {
         {/* Navigation */}
         <nav className="flex-1 p-3 overflow-y-auto space-y-0.5">
           {/* Intraday group */}
-          <SectionLabel label="Intraday · Symbols" />
+          <SectionLabel labelKey="navIntraday" t={t} />
           {INTRADAY_NAV.map((item) => (
-            <NavButton key={item.id} item={item} currentView={currentView} onClick={setCurrentView} />
+            <NavButton key={item.id} item={item} currentView={currentView} onClick={setCurrentView} t={t} />
           ))}
 
           {/* Swing group */}
-          <SectionLabel label="Swing · Any Symbol" />
+          <SectionLabel labelKey="navSwing" t={t} />
           {SWING_NAV.map((item) => (
-            <NavButton key={item.id} item={item} currentView={currentView} onClick={setCurrentView} />
+            <NavButton key={item.id} item={item} currentView={currentView} onClick={setCurrentView} t={t} />
           ))}
 
           {/* Reports */}
-          <SectionLabel label="Reports" />
+          <SectionLabel labelKey="navReports" t={t} />
           {REPORTS_NAV.map((item) => (
-            <NavButton key={item.id} item={item} currentView={currentView} onClick={setCurrentView} />
+            <NavButton key={item.id} item={item} currentView={currentView} onClick={setCurrentView} t={t} />
           ))}
 
           {/* Settings */}
-          <SectionLabel label="General" />
+          <SectionLabel labelKey="navGeneral" t={t} />
           <div>
             <button
               onClick={() => setCurrentView('settings')}
@@ -182,7 +191,7 @@ function AppContent() {
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              Settings
+              {t('settingsNav')}
             </button>
 
             {isSettings && (
@@ -209,7 +218,33 @@ function AppContent() {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-surface-600/50">
+        <div className="p-4 border-t border-surface-600/50 space-y-2">
+          {/* Language toggle */}
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">{t('language')}</span>
+            <div className="flex rounded-md overflow-hidden border border-surface-600/50">
+              <button
+                onClick={() => setLanguage('en')}
+                className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                  language === 'en'
+                    ? 'bg-primary-600/30 text-primary-300'
+                    : 'text-gray-500 hover:text-gray-300 hover:bg-surface-700'
+                }`}
+              >
+                EN
+              </button>
+              <button
+                onClick={() => setLanguage('ta')}
+                className={`px-2.5 py-1 text-[11px] font-medium transition-colors border-l border-surface-600/50 ${
+                  language === 'ta'
+                    ? 'bg-primary-600/30 text-primary-300'
+                    : 'text-gray-500 hover:text-gray-300 hover:bg-surface-700'
+                }`}
+              >
+                தமிழ்
+              </button>
+            </div>
+          </div>
           <button
             onClick={() => setShowAbout(true)}
             className="w-full text-xs text-gray-500 hover:text-primary-400 transition-colors py-1"
@@ -317,6 +352,7 @@ function AppContent() {
       )}
 
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
+      {showGuide && <UserGuideModal onClose={() => setShowGuide(false)} />}
     </div>
   );
 }

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useStockPlan } from '../../hooks/useStockPlan';
 import { useApp } from '../../store/appStore';
+import { useLanguage } from '../../hooks/useLanguage';
 import { EXECUTION_STATUSES, EXECUTION_STATUS_COLORS, TIMEFRAMES, TIMEFRAME_COLORS, STOCK_PLAN_BIAS_TAGS, STOCK_PLAN_BIAS_COLORS, formatDate } from '../../../shared/constants';
+import { BIAS_KEY_MAP } from '../../../shared/i18n';
 
 export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
   const { updatePlan, deletePlan, updateStatus, importChart } = useStockPlan();
   const { showNotification, symbols } = useApp();
+  const { t } = useLanguage();
 
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -190,7 +193,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          <span className="text-sm">Back</span>
+          <span className="text-sm">{t('back')}</span>
         </button>
         <div className="flex items-center gap-2">
           <span className="text-base font-semibold text-gray-200">{plan.stock_name}</span>
@@ -205,15 +208,15 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
             {confirmDelete ? (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-400">Delete this plan?</span>
-                <button onClick={handleDelete} className="btn-primary text-xs px-3 py-1.5 bg-red-600 hover:bg-red-500">Delete Forever</button>
-                <button onClick={() => setConfirmDelete(false)} className="btn-ghost text-xs px-3 py-1.5">Cancel</button>
+                <button onClick={handleDelete} className="btn-primary text-xs px-3 py-1.5 bg-red-600 hover:bg-red-500">{t('delete')}</button>
+                <button onClick={() => setConfirmDelete(false)} className="btn-ghost text-xs px-3 py-1.5">{t('cancel')}</button>
               </div>
             ) : (
               <button onClick={() => setConfirmDelete(true)} className="btn-ghost text-xs text-red-400 hover:text-red-300">
                 <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
-                Delete
+                {t('delete')}
               </button>
             )}
           </div>
@@ -223,7 +226,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
       {/* Chart section */}
       <div className="glass-card p-4" tabIndex={0} onPaste={handlePaste} style={{ outline: 'none' }}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-gray-300">Chart Snapshot</h3>
+          <h3 className="text-sm font-medium text-gray-300">{t('chartSnapshot')}</h3>
           <div className="flex items-center gap-3">
             {!readOnly && <span className="text-[10px] text-gray-600">Ctrl+V to paste</span>}
             {!readOnly && chartPath && (
@@ -231,7 +234,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
                 onClick={() => { setChartPath(null); setChartSrc(null); }}
                 className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
               >
-                Remove
+                {t('remove')}
               </button>
             )}
             {!readOnly && (
@@ -239,7 +242,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                {chartPath ? 'Replace' : 'Upload'}
+                {chartPath ? t('replace') : t('upload')}
               </button>
             )}
           </div>
@@ -270,7 +273,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Stock Name */}
           <div>
-            <label className="block text-[10px] text-gray-500 mb-1 uppercase">Stock Name</label>
+            <label className="block text-[10px] text-gray-500 mb-1 uppercase">{t('stockName')}</label>
             <select
               value={symbolId}
               onChange={(e) => setSymbolId(e.target.value)}
@@ -285,7 +288,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
 
           {/* Timeframe */}
           <div>
-            <label className="block text-[10px] text-gray-500 mb-1 uppercase">Timeframe</label>
+            <label className="block text-[10px] text-gray-500 mb-1 uppercase">{t('timeframe')}</label>
             <select
               value={timeframe}
               onChange={(e) => setTimeframe(e.target.value)}
@@ -300,7 +303,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
 
           {/* Plan Date */}
           <div>
-            <label className="block text-[10px] text-gray-500 mb-1 uppercase">Plan Date</label>
+            <label className="block text-[10px] text-gray-500 mb-1 uppercase">{t('planDate')}</label>
             <input
               type="date"
               value={planDate}
@@ -313,7 +316,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
 
         {/* Bias */}
         <div>
-          <label className="block text-[10px] text-gray-500 mb-2 uppercase">Bias</label>
+          <label className="block text-[10px] text-gray-500 mb-2 uppercase">{t('biasTag')}</label>
           <div className="flex flex-wrap gap-2">
             {STOCK_PLAN_BIAS_TAGS.map((tag) => {
               const colors = STOCK_PLAN_BIAS_COLORS[tag];
@@ -329,7 +332,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
                       : `bg-surface-700 text-gray-400 border-surface-600 ${readOnly ? 'cursor-default' : 'hover:border-surface-500'}`
                   }`}
                 >
-                  {tag}
+                  {t(BIAS_KEY_MAP[tag])}
                 </button>
               );
             })}
@@ -338,7 +341,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
 
         {/* Analysis */}
         <div>
-          <label className="block text-[10px] text-gray-500 mb-1 uppercase">Analysis / Trade Plan</label>
+          <label className="block text-[10px] text-gray-500 mb-1 uppercase">{t('analysisLabel')}</label>
           <textarea
             value={analysis}
             onChange={(e) => setAnalysis(e.target.value)}
@@ -352,7 +355,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
         {/* Price levels */}
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="block text-[10px] text-gray-500 mb-1 uppercase">Entry (optional)</label>
+            <label className="block text-[10px] text-gray-500 mb-1 uppercase">{t('entryPrice')}</label>
             <input
               type="number"
               step="any"
@@ -364,7 +367,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
             />
           </div>
           <div>
-            <label className="block text-[10px] text-gray-500 mb-1 uppercase">Target</label>
+            <label className="block text-[10px] text-gray-500 mb-1 uppercase">{t('target')}</label>
             <input
               type="number"
               step="any"
@@ -376,7 +379,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
             />
           </div>
           <div>
-            <label className="block text-[10px] text-gray-500 mb-1 uppercase">Stop Loss</label>
+            <label className="block text-[10px] text-gray-500 mb-1 uppercase">{t('stopLoss')}</label>
             <input
               type="number"
               step="any"
@@ -392,7 +395,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
 
       {/* Execution Status */}
       <div className="glass-card p-4">
-        <h3 className="text-sm font-medium text-gray-300 mb-3">Execution Status</h3>
+        <h3 className="text-sm font-medium text-gray-300 mb-3">{t('executionStatus')}</h3>
         <div className="flex gap-2">
           {EXECUTION_STATUSES.map((status) => {
             const colors = EXECUTION_STATUS_COLORS[status];
@@ -407,7 +410,7 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
                     : `bg-surface-700 text-gray-400 border-surface-600 ${readOnly ? 'cursor-default' : 'hover:border-surface-500'}`
                 }`}
               >
-                {status}
+                {t(status.toLowerCase())}
               </button>
             );
           })}
@@ -424,9 +427,9 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
-                Saving...
+                ...
               </span>
-            ) : 'Update Plan'}
+            ) : t('updatePlan')}
           </button>
         </div>
       )}

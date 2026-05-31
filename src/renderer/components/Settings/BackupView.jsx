@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../store/appStore';
+import { useLanguage } from '../../hooks/useLanguage';
 
 function StatusMessage({ status }) {
   if (!status) return null;
@@ -33,6 +34,7 @@ const Spinner = () => (
 
 export default function BackupView() {
   const { showNotification } = useApp();
+  const { t } = useLanguage();
 
   const [backupBusy, setBackupBusy]     = useState(false);
   const [restoreBusy, setRestoreBusy]   = useState(false);
@@ -108,7 +110,7 @@ export default function BackupView() {
             </svg>
           </div>
           <div>
-            <span className="text-sm font-semibold text-gray-200 block mb-1">Create Backup</span>
+            <span className="text-sm font-semibold text-gray-200 block mb-1">{t('createBackupTitle')}</span>
             <p className="text-xs text-gray-500 leading-relaxed">
               Exports everything — trading days, swing plans, verdicts, notes, and all images — into a single{' '}
               <span className="text-gray-400 font-mono">.tpbj</span> file.
@@ -131,7 +133,7 @@ export default function BackupView() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
             </svg>
           )}
-          {backupBusy ? 'Creating backup…' : 'Create Backup (.tpbj)'}
+          {backupBusy ? t('creatingBackup') : t('createBackup')}
         </button>
 
         <StatusMessage status={backupStatus} />
@@ -146,7 +148,7 @@ export default function BackupView() {
             </svg>
           </div>
           <div>
-            <span className="text-sm font-semibold text-gray-200 block mb-1">Restore from Backup</span>
+            <span className="text-sm font-semibold text-gray-200 block mb-1">{t('restoreBackupTitle')}</span>
             <p className="text-xs text-gray-500 leading-relaxed">
               Imports a <span className="text-gray-400 font-mono">.tpbj</span> backup file.
               New records are merged into your current data — existing entries are not overwritten and nothing is deleted.
@@ -168,7 +170,7 @@ export default function BackupView() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
           )}
-          {restoreBusy ? 'Restoring…' : 'Select & Restore Backup'}
+          {restoreBusy ? t('restoringBackup') : t('restoreBackup')}
         </button>
 
         <StatusMessage status={restoreStatus} />

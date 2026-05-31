@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../store/appStore';
+import { useLanguage } from '../../hooks/useLanguage';
 import { formatDate, OUTCOME_COLORS, BIAS_COLORS, formatPossibilityCode, getBehaviorTag, BEHAVIOR_TAGS, getOutcomeColors, CUSTOM_VERDICT_COLORS } from '../../../shared/constants';
 import DayDetailView from './DayDetailView';
 import QueryPanel from './QueryPanel';
@@ -90,6 +91,7 @@ export default function GalleryView() {
 }
 
 function GalleryTabs({ activeTab, setActiveTab }) {
+  const { t } = useLanguage();
   return (
     <div className="flex gap-1 p-1 bg-surface-800 rounded-lg w-fit">
       <button
@@ -100,7 +102,7 @@ function GalleryTabs({ activeTab, setActiveTab }) {
             : 'text-gray-400 hover:text-gray-200'
         }`}
       >
-        Gallery
+        {t('gallery')}
       </button>
       <button
         onClick={() => setActiveTab('metrics')}
@@ -110,13 +112,14 @@ function GalleryTabs({ activeTab, setActiveTab }) {
             : 'text-gray-400 hover:text-gray-200'
         }`}
       >
-        Metrics
+        {t('metrics')}
       </button>
     </div>
   );
 }
 
 function DayCard({ day, onClick, onDelete }) {
+  const { t } = useLanguage();
   const hasVerdict = !!day.verdict_code;
   const isUnprepared = hasVerdict && !day.verdict_had_plan;
   const behaviorTag = hasVerdict ? getBehaviorTag(day.verdict_code, day.verdict_outcome) : null;
@@ -165,7 +168,7 @@ function DayCard({ day, onClick, onDelete }) {
 
               {hasVerdict ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 font-medium">Verdict:</span>
+                  <span className="text-xs text-gray-500 font-medium">{t('tabVerdict')}:</span>
                   <span className="text-sm font-medium text-gray-200">
                     {formatPossibilityCode(day.verdict_code)}
                   </span>
@@ -180,7 +183,7 @@ function DayCard({ day, onClick, onDelete }) {
                 </div>
               ) : hasCustomVerdicts ? (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-gray-500 font-medium">Verdict:</span>
+                  <span className="text-xs text-gray-500 font-medium">{t('tabVerdict')}:</span>
                   {customPlanVerdicts.map((status, i) => {
                     const c = CUSTOM_VERDICT_COLORS[status];
                     return c ? (
@@ -192,7 +195,7 @@ function DayCard({ day, onClick, onDelete }) {
                 </div>
               ) : (
                 <span className="badge text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                  Verdict Pending
+                  {t('verdictPending')}
                 </span>
               )}
 
@@ -213,7 +216,7 @@ function DayCard({ day, onClick, onDelete }) {
           <div className="flex items-center gap-2">
             {isUnprepared && (
               <span className="badge text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                Unprepared
+                {t('unprepared')}
               </span>
             )}
             {screenshotPaths.length > 0 && (
@@ -235,7 +238,7 @@ function DayCard({ day, onClick, onDelete }) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
           </svg>
-          View
+          {t('view')}
         </button>
         {!confirmDelete ? (
           <button
@@ -245,11 +248,11 @@ function DayCard({ day, onClick, onDelete }) {
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
-            Remove
+            {t('remove')}
           </button>
         ) : (
           <div className="flex items-center gap-1.5 bg-surface-700 border border-surface-500 rounded-lg px-2 py-1">
-            <span className="text-[11px] text-gray-300 whitespace-nowrap">Remove?</span>
+            <span className="text-[11px] text-gray-300 whitespace-nowrap">{t('remove')}?</span>
             <button
               onClick={handleDelete}
               disabled={deleting}

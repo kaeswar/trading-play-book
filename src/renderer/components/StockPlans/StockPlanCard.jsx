@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { EXECUTION_STATUS_COLORS, TIMEFRAME_COLORS, STOCK_PLAN_BIAS_COLORS } from '../../../shared/constants';
+import { useLanguage } from '../../hooks/useLanguage';
 
 export default function StockPlanCard({ plan, onClick, onDelete }) {
+  const { t } = useLanguage();
   const [chartSrc, setChartSrc] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -68,13 +70,13 @@ export default function StockPlanCard({ plan, onClick, onDelete }) {
           {/* Price levels */}
           <div className="flex items-center gap-3 text-xs text-gray-400">
             {plan.entry_price && (
-              <span>Entry: <span className="text-gray-300">{plan.entry_price}</span></span>
+              <span>{t('entryPrice')}: <span className="text-gray-300">{plan.entry_price}</span></span>
             )}
             {plan.target_price && (
-              <span>Target: <span className="text-emerald-400">{plan.target_price}</span></span>
+              <span>{t('target')}: <span className="text-emerald-400">{plan.target_price}</span></span>
             )}
             {plan.stop_loss && (
-              <span>SL: <span className="text-red-400">{plan.stop_loss}</span></span>
+              <span>{t('stopLoss')}: <span className="text-red-400">{plan.stop_loss}</span></span>
             )}
           </div>
 
@@ -95,9 +97,9 @@ export default function StockPlanCard({ plan, onClick, onDelete }) {
         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           {confirmDelete ? (
             <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-              <span className="text-xs text-gray-400">Delete?</span>
-              <button onClick={handleDelete} className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded bg-red-500/10">Yes</button>
-              <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }} className="text-xs text-gray-400 hover:text-gray-300 px-2 py-1 rounded bg-surface-600">No</button>
+              <span className="text-xs text-gray-400">{t('delete')}?</span>
+              <button onClick={handleDelete} className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded bg-red-500/10">{t('yes')}</button>
+              <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }} className="text-xs text-gray-400 hover:text-gray-300 px-2 py-1 rounded bg-surface-600">{t('no')}</button>
             </div>
           ) : (
             <button onClick={handleDelete} className="p-1.5 text-gray-500 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors">

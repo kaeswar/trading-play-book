@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLanguage } from '../../hooks/useLanguage';
 import { POSSIBILITIES, OUTCOMES, BIAS_COLORS, OUTCOME_COLORS, formatPossibilityCode } from '../../../shared/constants';
 
 export default function VerdictForm({ tradingDay, existingVerdict, existingScreenshots = [], onSave, onCancel }) {
+  const { t } = useLanguage();
   const [selectedPossibility, setSelectedPossibility] = useState(existingVerdict?.possibility_code || '');
   const [selectedOutcome, setSelectedOutcome] = useState(existingVerdict?.outcome || '');
   const [notes, setNotes] = useState(existingVerdict?.notes || '');
@@ -90,7 +92,7 @@ export default function VerdictForm({ tradingDay, existingVerdict, existingScree
       {/* Possibility Selection */}
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-3">
-          Which opening scenario occurred?
+          {t('whichScenario')}
         </label>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {POSSIBILITIES.map((p) => {
@@ -125,7 +127,7 @@ export default function VerdictForm({ tradingDay, existingVerdict, existingScree
       {selectedPossibility && (
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-3">
-            What was the outcome?
+            {t('whatOutcome')}
           </label>
           <div className="flex gap-3">
             {OUTCOMES.map((oc) => {
@@ -144,7 +146,7 @@ export default function VerdictForm({ tradingDay, existingVerdict, existingScree
                   }`}
                 >
                   <p className={`text-sm font-semibold ${isSelected ? 'text-primary-400' : colors.text}`}>
-                    {oc}
+                    {t(oc.toLowerCase())}
                   </p>
                 </button>
               );
@@ -157,7 +159,7 @@ export default function VerdictForm({ tradingDay, existingVerdict, existingScree
       {selectedPossibility && selectedOutcome && (
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Notes (optional)
+            {t('notesOptional')}
           </label>
           <textarea
             ref={textareaRef}
@@ -172,7 +174,7 @@ export default function VerdictForm({ tradingDay, existingVerdict, existingScree
           {/* Screenshot section */}
           <div className="mt-3">
             <div className="flex items-center justify-between mb-2">
-              <label className="text-[10px] text-gray-500 uppercase">Screenshots</label>
+              <label className="text-[10px] text-gray-500 uppercase">{t('screenshots')}</label>
               <button
                 type="button"
                 onClick={handleAddFile}
@@ -196,7 +198,7 @@ export default function VerdictForm({ tradingDay, existingVerdict, existingScree
                 ))}
               </div>
             ) : (
-              <p className="text-[10px] text-gray-600">Paste from clipboard or click Add to attach screenshots</p>
+              <p className="text-[10px] text-gray-600">{t('pasteOrAdd')}</p>
             )}
           </div>
         </div>
@@ -210,11 +212,11 @@ export default function VerdictForm({ tradingDay, existingVerdict, existingScree
             disabled={submitting}
             className="btn-primary flex-1"
           >
-            {submitting ? 'Saving...' : existingVerdict ? 'Update Verdict' : 'Save Verdict'}
+            {submitting ? t('saving') : existingVerdict ? t('updateVerdict') : t('saveVerdict')}
           </button>
           {onCancel && (
             <button type="button" onClick={onCancel} className="btn-secondary">
-              Cancel
+              {t('cancel')}
             </button>
           )}
         </div>

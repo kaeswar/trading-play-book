@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useStockPlan } from '../../hooks/useStockPlan';
 import { useApp } from '../../store/appStore';
+import { useLanguage } from '../../hooks/useLanguage';
 import { TIMEFRAMES } from '../../../shared/constants';
 import StockPlanCard from './StockPlanCard';
 import StockPlanDetail from './StockPlanDetail';
@@ -9,6 +10,7 @@ import StockPlanForm from './StockPlanForm';
 export default function StockPlansView() {
   const { searchPlans, deletePlan } = useStockPlan();
   const { showNotification } = useApp();
+  const { t } = useLanguage();
 
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,7 +74,7 @@ export default function StockPlansView() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by stock name..."
+              placeholder={t('searchByStock')}
               className="input-field text-sm pl-9 w-full"
             />
           </div>
@@ -82,7 +84,7 @@ export default function StockPlansView() {
             onChange={(e) => setTimeframeFilter(e.target.value)}
             className="input-field text-sm w-auto"
           >
-            <option value="">All Timeframes</option>
+            <option value="">{t('allTimeframes')}</option>
             {TIMEFRAMES.map((tf) => (
               <option key={tf} value={tf}>{tf}</option>
             ))}
@@ -92,7 +94,7 @@ export default function StockPlansView() {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            New Plan
+            {t('newPlan')}
           </button>
         </div>
       </div>
@@ -114,7 +116,7 @@ export default function StockPlansView() {
           <p className="text-gray-400 mb-1">No active swing plans</p>
           <p className="text-sm text-gray-500">Create a new plan or check the Gallery for completed ones</p>
           <button onClick={() => setShowForm(true)} className="btn-primary text-sm px-5 py-2 mt-4">
-            Create Plan
+            {t('createPlan')}
           </button>
         </div>
       ) : (

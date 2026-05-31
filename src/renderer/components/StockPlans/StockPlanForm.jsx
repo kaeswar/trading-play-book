@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useStockPlan } from '../../hooks/useStockPlan';
 import { useApp } from '../../store/appStore';
+import { useLanguage } from '../../hooks/useLanguage';
 import { TIMEFRAMES, STOCK_PLAN_BIAS_TAGS, STOCK_PLAN_BIAS_COLORS, EXECUTION_STATUSES, EXECUTION_STATUS_COLORS } from '../../../shared/constants';
+import { BIAS_KEY_MAP } from '../../../shared/i18n';
 
 export default function StockPlanForm({ onCreated, onCancel }) {
   const { createPlan, importChart } = useStockPlan();
   const { showNotification, symbols } = useApp();
+  const { t } = useLanguage();
 
   const [symbolId, setSymbolId] = useState('');
   const [timeframe, setTimeframe] = useState('Weekly');
@@ -115,17 +118,17 @@ export default function StockPlanForm({ onCreated, onCancel }) {
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          <span className="text-sm">Cancel</span>
+          <span className="text-sm">{t('cancel')}</span>
         </button>
       </div>
 
       <div className="glass-card p-5 space-y-4">
-        <h3 className="text-base font-semibold text-gray-200">New Stock Swing Plan</h3>
+        <h3 className="text-base font-semibold text-gray-200">{t('newSwingPlan')}</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Stock Name */}
           <div>
-            <label className="block text-[10px] text-gray-500 mb-1 uppercase">Stock Name</label>
+            <label className="block text-[10px] text-gray-500 mb-1 uppercase">{t('stockName')}</label>
             <select
               value={symbolId}
               onChange={(e) => setSymbolId(e.target.value)}
@@ -139,7 +142,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
 
           {/* Timeframe */}
           <div>
-            <label className="block text-[10px] text-gray-500 mb-1 uppercase">Timeframe</label>
+            <label className="block text-[10px] text-gray-500 mb-1 uppercase">{t('timeframe')}</label>
             <select
               value={timeframe}
               onChange={(e) => setTimeframe(e.target.value)}
@@ -153,7 +156,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
 
           {/* Plan Date */}
           <div>
-            <label className="block text-[10px] text-gray-500 mb-1 uppercase">Plan Date</label>
+            <label className="block text-[10px] text-gray-500 mb-1 uppercase">{t('planDate')}</label>
             <input
               type="date"
               value={planDate}
@@ -165,7 +168,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
 
         {/* Bias */}
         <div>
-          <label className="block text-[10px] text-gray-500 mb-2 uppercase">Bias</label>
+          <label className="block text-[10px] text-gray-500 mb-2 uppercase">{t('biasTag')}</label>
           <div className="flex flex-wrap gap-2">
             {STOCK_PLAN_BIAS_TAGS.map((tag) => {
               const colors = STOCK_PLAN_BIAS_COLORS[tag];
@@ -181,7 +184,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
                       : 'bg-surface-700 text-gray-400 border-surface-600 hover:border-surface-500'
                   }`}
                 >
-                  {tag}
+                  {t(BIAS_KEY_MAP[tag])}
                 </button>
               );
             })}
@@ -190,7 +193,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
 
         {/* Analysis */}
         <div>
-          <label className="block text-[10px] text-gray-500 mb-1 uppercase">Analysis / Trade Plan</label>
+          <label className="block text-[10px] text-gray-500 mb-1 uppercase">{t('analysisLabel')}</label>
           <textarea
             value={analysis}
             onChange={(e) => setAnalysis(e.target.value)}
@@ -203,7 +206,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
         {/* Price levels */}
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="block text-[10px] text-gray-500 mb-1 uppercase">Entry (optional)</label>
+            <label className="block text-[10px] text-gray-500 mb-1 uppercase">{t('entryPrice')}</label>
             <input
               type="number"
               step="any"
@@ -214,7 +217,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
             />
           </div>
           <div>
-            <label className="block text-[10px] text-gray-500 mb-1 uppercase">Target</label>
+            <label className="block text-[10px] text-gray-500 mb-1 uppercase">{t('target')}</label>
             <input
               type="number"
               step="any"
@@ -225,7 +228,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
             />
           </div>
           <div>
-            <label className="block text-[10px] text-gray-500 mb-1 uppercase">Stop Loss</label>
+            <label className="block text-[10px] text-gray-500 mb-1 uppercase">{t('stopLoss')}</label>
             <input
               type="number"
               step="any"
@@ -240,7 +243,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
         {/* Chart upload */}
         <div tabIndex={0} onPaste={handlePaste} className="outline-none">
           <div className="flex items-center justify-between mb-1">
-            <label className="block text-[10px] text-gray-500 uppercase">Chart Snapshot</label>
+            <label className="block text-[10px] text-gray-500 uppercase">{t('chartSnapshot')}</label>
             <span className="text-[10px] text-gray-600">Ctrl+V to paste</span>
           </div>
           {chartSrc ? (
@@ -251,13 +254,13 @@ export default function StockPlanForm({ onCreated, onCancel }) {
                   onClick={handleChartUpload}
                   className="text-xs bg-surface-800/90 text-gray-300 px-2 py-1 rounded hover:bg-surface-700 transition-colors"
                 >
-                  Replace
+                  {t('replace')}
                 </button>
                 <button
                   onClick={() => { setChartFile(null); setChartRelPath(null); setChartSrc(null); }}
                   className="text-xs bg-surface-800/90 text-red-400 px-2 py-1 rounded hover:bg-red-500/20 transition-colors"
                 >
-                  Remove
+                  {t('remove')}
                 </button>
               </div>
             </div>
@@ -282,7 +285,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
 
       {/* Execution Status */}
       <div className="glass-card p-4">
-        <label className="block text-[10px] text-gray-500 mb-3 uppercase">Execution Status</label>
+        <label className="block text-[10px] text-gray-500 mb-3 uppercase">{t('executionStatus')}</label>
         <div className="flex flex-wrap gap-2">
           {EXECUTION_STATUSES.map((status) => {
             const colors = EXECUTION_STATUS_COLORS[status];
@@ -298,7 +301,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
                     : 'bg-surface-700 text-gray-400 border-surface-600 hover:border-surface-500'
                 }`}
               >
-                {status}
+                {t(status.toLowerCase())}
               </button>
             );
           })}
@@ -307,9 +310,9 @@ export default function StockPlanForm({ onCreated, onCancel }) {
 
       {/* Submit */}
       <div className="flex justify-end gap-3">
-        <button onClick={onCancel} className="btn-ghost text-sm px-4 py-2">Cancel</button>
+        <button onClick={onCancel} className="btn-ghost text-sm px-4 py-2">{t('cancel')}</button>
         <button onClick={handleSubmit} disabled={saving} className="btn-primary text-sm px-6 py-2">
-          {saving ? 'Creating...' : 'Create Plan'}
+          {saving ? '...' : t('createPlan')}
         </button>
       </div>
     </div>

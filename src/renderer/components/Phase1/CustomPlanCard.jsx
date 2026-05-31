@@ -1,12 +1,15 @@
 import React, { useState, forwardRef, useImperativeHandle } from 'react';
 import { useCustomPlan } from '../../hooks/useCustomPlan';
 import { useApp } from '../../store/appStore';
+import { useLanguage } from '../../hooks/useLanguage';
+import { BIAS_KEY_MAP } from '../../../shared/i18n';
 import { CUSTOM_VERDICT_STATUSES, CUSTOM_VERDICT_COLORS, CUSTOM_PLAN_BIAS_TAGS, BEHAVIOR_TAGS } from '../../../shared/constants';
 import CustomPlanScreenshotUploader from './CustomPlanScreenshotUploader';
 
 const CustomPlanCard = forwardRef(function CustomPlanCard({ customPlan, tradingDay, onRefresh, onDelete }, ref) {
   const { updateCustomPlan, saveCustomPlanVerdict } = useCustomPlan();
   const { showNotification } = useApp();
+  const { t } = useLanguage();
 
   const [expanded, setExpanded] = useState(false);
   const [title, setTitle] = useState(customPlan.title || '');
@@ -105,7 +108,7 @@ const CustomPlanCard = forwardRef(function CustomPlanCard({ customPlan, tradingD
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="w-1.5 h-8 rounded-full bg-gradient-to-b from-purple-500 to-fuchsia-500 flex-shrink-0"></div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-gray-200 truncate">{title || 'Untitled Plan'}</p>
+            <p className="text-sm text-gray-200 truncate">{title || t('untitledPlan')}</p>
             <div className="flex items-center gap-2 mt-0.5">
               {target !== '' && target !== null && (
                 <span className="text-[10px] text-emerald-400">T: {target}</span>
@@ -121,13 +124,13 @@ const CustomPlanCard = forwardRef(function CustomPlanCard({ customPlan, tradingD
             const tagColors = BEHAVIOR_TAGS[biasTag];
             return tagColors ? (
               <span className={`text-[10px] px-2 py-0.5 rounded-full ${tagColors.bg} ${tagColors.text} ${tagColors.border} border`}>
-                {biasTag}
+                {t(BIAS_KEY_MAP[biasTag])}
               </span>
             ) : null;
           })()}
           {hasVerdict && (
             <span className={`text-[10px] px-2 py-0.5 rounded-full ${verdictColors.bg} ${verdictColors.text} ${verdictColors.border} border`}>
-              {verdictStatus}
+              {t(verdictStatus.toLowerCase())}
             </span>
           )}
           <svg
@@ -144,7 +147,7 @@ const CustomPlanCard = forwardRef(function CustomPlanCard({ customPlan, tradingD
         <div className="px-4 pb-4 space-y-4 border-t border-surface-600/30">
           {/* Title */}
           <div className="pt-3">
-            <label className="text-[10px] text-gray-500 uppercase mb-1 block">Title</label>
+            <label className="text-[10px] text-gray-500 uppercase mb-1 block">{t('planTitleLabel')}</label>
             <input
               type="text"
               value={title}
@@ -156,7 +159,7 @@ const CustomPlanCard = forwardRef(function CustomPlanCard({ customPlan, tradingD
 
           {/* Trade Plan Text */}
           <div>
-            <label className="text-[10px] text-gray-500 uppercase mb-1 block">Trade Plan</label>
+            <label className="text-[10px] text-gray-500 uppercase mb-1 block">{t('tradePlanLabel')}</label>
             <textarea
               value={tradePlan}
               onChange={(e) => setTradePlan(e.target.value)}
@@ -168,7 +171,7 @@ const CustomPlanCard = forwardRef(function CustomPlanCard({ customPlan, tradingD
 
           {/* Bias Tag */}
           <div>
-            <label className="text-[10px] text-gray-500 uppercase mb-2 block">Bias Tag</label>
+            <label className="text-[10px] text-gray-500 uppercase mb-2 block">{t('biasTagLabel')}</label>
             <div className="flex flex-wrap gap-2">
               {CUSTOM_PLAN_BIAS_TAGS.map((tag) => {
                 const colors = BEHAVIOR_TAGS[tag];
@@ -183,7 +186,7 @@ const CustomPlanCard = forwardRef(function CustomPlanCard({ customPlan, tradingD
                         : 'bg-surface-800 border-surface-600 text-gray-400 hover:border-surface-500'
                     }`}
                   >
-                    {tag}
+                    {t(BIAS_KEY_MAP[tag])}
                   </button>
                 );
               })}
@@ -193,7 +196,7 @@ const CustomPlanCard = forwardRef(function CustomPlanCard({ customPlan, tradingD
           {/* Target & Stop Out */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] text-gray-500 uppercase mb-1 block">Target</label>
+              <label className="text-[10px] text-gray-500 uppercase mb-1 block">{t('target')}</label>
               <input
                 type="number"
                 value={target}
@@ -204,7 +207,7 @@ const CustomPlanCard = forwardRef(function CustomPlanCard({ customPlan, tradingD
               />
             </div>
             <div>
-              <label className="text-[10px] text-gray-500 uppercase mb-1 block">Stop Out</label>
+              <label className="text-[10px] text-gray-500 uppercase mb-1 block">{t('stopOut')}</label>
               <input
                 type="number"
                 value={stopOut}
@@ -223,7 +226,7 @@ const CustomPlanCard = forwardRef(function CustomPlanCard({ customPlan, tradingD
               disabled={saving}
               className="text-xs px-4 py-1.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg transition-colors disabled:opacity-50"
             >
-              {saving ? 'Saving...' : 'Save Plan'}
+              {saving ? t('saving') : t('savePlan')}
             </button>
           </div>
 
@@ -237,7 +240,7 @@ const CustomPlanCard = forwardRef(function CustomPlanCard({ customPlan, tradingD
 
           {/* Verdict Section */}
           <div className="pt-2 border-t border-surface-600/30">
-            <label className="text-[10px] text-gray-500 uppercase mb-2 block">Verdict</label>
+            <label className="text-[10px] text-gray-500 uppercase mb-2 block">{t('tabVerdict')}</label>
             <div className="flex gap-2 mb-3">
               {CUSTOM_VERDICT_STATUSES.map((status) => {
                 const colors = CUSTOM_VERDICT_COLORS[status];
@@ -252,7 +255,7 @@ const CustomPlanCard = forwardRef(function CustomPlanCard({ customPlan, tradingD
                         : 'bg-surface-800 border-surface-600 text-gray-400 hover:border-surface-500'
                     }`}
                   >
-                    {status}
+                    {t(status.toLowerCase())}
                   </button>
                 );
               })}
@@ -278,7 +281,7 @@ const CustomPlanCard = forwardRef(function CustomPlanCard({ customPlan, tradingD
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
-              Delete
+              {t('delete')}
             </button>
           </div>
         </div>

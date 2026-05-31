@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -73,10 +73,60 @@ function createWindow() {
   }
 }
 
+function buildMenu() {
+  const template = [
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Exit',
+          accelerator: 'Alt+F4',
+          click: () => app.quit(),
+        },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'togglefullscreen' },
+      ],
+    },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'User Guide',
+          accelerator: 'F1',
+          click: () => mainWindow?.webContents.send('menu:open-guide'),
+        },
+        { type: 'separator' },
+        {
+          label: 'About Trading Play Book',
+          click: () => mainWindow?.webContents.send('menu:open-about'),
+        },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 // Initialize app
 app.whenReady().then(() => {
   initializeDatabase();
   registerIpcHandlers();
+  buildMenu();
   createWindow();
 
   app.on('activate', () => {

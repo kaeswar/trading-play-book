@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { useCustomPlan } from '../../hooks/useCustomPlan';
 import { useApp } from '../../store/appStore';
+import { useLanguage } from '../../hooks/useLanguage';
 import CustomPlanCard from './CustomPlanCard';
 
 const CustomPlansSection = forwardRef(function CustomPlansSection({ tradingDay, onRefresh }, ref) {
   const { getCustomPlans, saveCustomPlan, deleteCustomPlan } = useCustomPlan();
   const { showNotification } = useApp();
+  const { t } = useLanguage();
   const [customPlans, setCustomPlans] = useState([]);
   const [loading, setLoading] = useState(false);
   const cardRefs = useRef({});
@@ -76,7 +78,7 @@ const CustomPlansSection = forwardRef(function CustomPlansSection({ tradingDay, 
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="h-2 w-2 rounded-full bg-gradient-to-r from-purple-500 to-fuchsia-500"></div>
-          <h3 className="section-title text-purple-400">Custom Plans</h3>
+          <h3 className="section-title text-purple-400">{t('customPlans')}</h3>
           {customPlans.length > 0 && (
             <span className="text-[10px] text-gray-500 ml-1">({customPlans.length})</span>
           )}
@@ -88,7 +90,7 @@ const CustomPlansSection = forwardRef(function CustomPlansSection({ tradingDay, 
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Add Plan
+          {t('addPlan')}
         </button>
       </div>
 
@@ -114,7 +116,7 @@ const CustomPlansSection = forwardRef(function CustomPlansSection({ tradingDay, 
       )}
 
       {!loading && customPlans.length === 0 && (
-        <p className="text-xs text-gray-600 text-center py-3">No custom plans yet. Click "+ Add Plan" to create one.</p>
+        <p className="text-xs text-gray-600 text-center py-3">{t('noCustomPlansYet')}</p>
       )}
     </div>
   );

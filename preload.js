@@ -166,4 +166,12 @@ contextBridge.exposeInMainWorld('api', {
     search: (filters) => ipcRenderer.invoke('stockPlan:search', filters),
     getDistinctStockNames: () => ipcRenderer.invoke('stockPlan:getDistinctStockNames'),
   },
+
+  // Main → Renderer events (menu actions)
+  on: (channel, callback) => {
+    const allowed = ['menu:open-about', 'menu:open-guide'];
+    if (allowed.includes(channel)) {
+      ipcRenderer.on(channel, (_event, ...args) => callback(...args));
+    }
+  },
 });

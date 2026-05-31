@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../../store/appStore';
 import { useTradingDay } from '../../hooks/useTradingDay';
+import { useLanguage } from '../../hooks/useLanguage';
 import { POSSIBILITIES, BIAS_COLORS, formatDate } from '../../../shared/constants';
 import PossibilityCard from './PossibilityCard';
 import CustomPlansSection from './CustomPlansSection';
@@ -9,6 +10,7 @@ import BehaviorView from '../Phase3/BehaviorView';
 export default function PlanningView() {
   const { selectedSymbol, selectedDate, showNotification, setSaveDayPlanFn, setSavingDayPlan, refreshDatesFn, showNoPlan, setShowNoPlan } = useApp();
   const { createOrGetTradingDay, getTradingDayDetails, updateNotes } = useTradingDay();
+  const { t } = useLanguage();
 
   const [tradingDay, setTradingDay] = useState(null);
   const [notes, setNotes] = useState('');
@@ -107,7 +109,7 @@ export default function PlanningView() {
   if (!selectedSymbol) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-gray-500">Select a symbol to begin planning</p>
+        <p className="text-gray-500">{t('selectSymbol')}</p>
       </div>
     );
   }
@@ -130,11 +132,11 @@ export default function PlanningView() {
           </svg>
         </div>
         <div className="text-center">
-          <p className="text-gray-300 font-medium">No Trading Plan for {formatDate(selectedDate)}</p>
-          <p className="text-sm text-gray-500 mt-1">Would you like to create a new day plan?</p>
+          <p className="text-gray-300 font-medium">{t('noTradingPlanFor').replace('{date}', formatDate(selectedDate))}</p>
+          <p className="text-sm text-gray-500 mt-1">{t('createDayPrompt')}</p>
         </div>
         <button onClick={handleCreateDay} className="btn-primary text-sm px-6 py-2">
-          Create Day Plan
+          {t('createDayPlan')}
         </button>
       </div>
     );
@@ -156,13 +158,13 @@ export default function PlanningView() {
             onClick={() => setSubView('plan')}
             className="px-4 py-2 rounded-md text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"
           >
-            New Plan
+            {t('newPlan')}
           </button>
           <button
             onClick={() => setSubView('analysis')}
             className="px-4 py-2 rounded-md text-sm font-medium bg-primary-600 text-white transition-colors"
           >
-            Plan Analysis
+            {t('planAnalysis')}
           </button>
         </div>
         <BehaviorView />
@@ -178,13 +180,13 @@ export default function PlanningView() {
           onClick={() => setSubView('plan')}
           className="px-4 py-2 rounded-md text-sm font-medium bg-primary-600 text-white transition-colors"
         >
-          New Plan
+          {t('newPlan')}
         </button>
         <button
           onClick={() => setSubView('analysis')}
           className="px-4 py-2 rounded-md text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"
         >
-          Plan Analysis
+          {t('planAnalysis')}
         </button>
       </div>
 
@@ -200,7 +202,7 @@ export default function PlanningView() {
             onChange={(e) => setNotes(e.target.value)}
             onFocus={() => setNotesFocused(true)}
             onBlur={() => setNotesFocused(false)}
-            placeholder="Add day notes..."
+            placeholder={t('addDayNotes')}
             className={`flex-1 bg-transparent text-sm text-gray-300 placeholder-gray-600 focus:outline-none ${notesFocused ? '' : 'truncate'}`}
           />
           {!notesFocused && !notes && (
@@ -212,7 +214,7 @@ export default function PlanningView() {
       {/* Filter toggle */}
       <div className="flex justify-end">
         <label className="flex items-center gap-2 cursor-pointer">
-          <span className="text-xs text-gray-400">Show No Plan</span>
+          <span className="text-xs text-gray-400">{t('showNoPlan')}</span>
           <input
             type="checkbox"
             checked={showNoPlan}
@@ -226,7 +228,7 @@ export default function PlanningView() {
       <div>
         <div className="flex items-center gap-2 mb-4">
           <div className={`h-2 w-2 rounded-full bg-gradient-to-r ${BIAS_COLORS.Bullish.accent}`}></div>
-          <h3 className="section-title text-blue-400">Bullish Default Plans</h3>
+          <h3 className="section-title text-blue-400">{t('bullishDefaultPlans')}</h3>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {bullishPossibilities.map((p) => {
@@ -249,7 +251,7 @@ export default function PlanningView() {
       <div>
         <div className="flex items-center gap-2 mb-4">
           <div className={`h-2 w-2 rounded-full bg-gradient-to-r ${BIAS_COLORS.Bearish.accent}`}></div>
-          <h3 className="section-title text-red-400">Bearish Default Plans</h3>
+          <h3 className="section-title text-red-400">{t('bearishDefaultPlans')}</h3>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {bearishPossibilities.map((p) => {

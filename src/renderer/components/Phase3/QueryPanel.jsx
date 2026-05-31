@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useApp } from '../../store/appStore';
+import { useLanguage } from '../../hooks/useLanguage';
 import { POSSIBILITIES, OUTCOMES, formatPossibilityCode } from '../../../shared/constants';
 
 export default function QueryPanel({ filters, onFilterChange }) {
   const { symbols } = useApp();
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
 
   const updateFilter = (key, value) => {
@@ -32,7 +34,7 @@ export default function QueryPanel({ filters, onFilterChange }) {
           <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
           </svg>
-          <span className="text-sm font-medium text-gray-300">Filters</span>
+          <span className="text-sm font-medium text-gray-300">{t('filters')}</span>
           {activeFilterCount > 0 && (
             <span className="badge bg-primary-500/20 text-primary-400 text-xs">{activeFilterCount}</span>
           )}
@@ -52,7 +54,7 @@ export default function QueryPanel({ filters, onFilterChange }) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Date Range */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase">Date From</label>
+              <label className="block text-xs text-gray-500 mb-1 uppercase">{t('filterDateFrom')}</label>
               <input
                 type="date"
                 value={filters.dateFrom || ''}
@@ -61,7 +63,7 @@ export default function QueryPanel({ filters, onFilterChange }) {
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase">Date To</label>
+              <label className="block text-xs text-gray-500 mb-1 uppercase">{t('filterDateTo')}</label>
               <input
                 type="date"
                 value={filters.dateTo || ''}
@@ -72,13 +74,13 @@ export default function QueryPanel({ filters, onFilterChange }) {
 
             {/* Possibility */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase">Default Plan</label>
+              <label className="block text-xs text-gray-500 mb-1 uppercase">{t('filterDefaultPlan')}</label>
               <select
                 value={filters.possibilityCode || ''}
                 onChange={(e) => updateFilter('possibilityCode', e.target.value)}
                 className="input-field text-sm"
               >
-                <option value="">All</option>
+                <option value="">{t('filterAll')}</option>
                 {POSSIBILITIES.map((p) => (
                   <option key={p.code} value={p.code}>{formatPossibilityCode(p.code)}</option>
                 ))}
@@ -87,46 +89,46 @@ export default function QueryPanel({ filters, onFilterChange }) {
 
             {/* Outcome / Verdict */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase">Outcome / Verdict</label>
+              <label className="block text-xs text-gray-500 mb-1 uppercase">{t('filterOutcome')}</label>
               <select
                 value={filters.outcome || ''}
                 onChange={(e) => updateFilter('outcome', e.target.value)}
                 className="input-field text-sm"
               >
-                <option value="">All</option>
-                <optgroup label="Default Plan">
+                <option value="">{t('filterAll')}</option>
+                <optgroup label={t('filterDefaultPlan')}>
                   <option value="Accepted">Accepted</option>
                   <option value="Rejected">Rejected</option>
                 </optgroup>
                 <optgroup label="Custom Plan">
-                  <option value="Pass">Pass</option>
-                  <option value="Fail">Fail</option>
-                  <option value="Partial">Partial</option>
-                  <option value="Cancelled">Cancelled</option>
+                  <option value="Pass">{t('pass')}</option>
+                  <option value="Fail">{t('fail')}</option>
+                  <option value="Partial">{t('partial')}</option>
+                  <option value="Cancelled">{t('cancelled')}</option>
                 </optgroup>
               </select>
             </div>
 
             {/* Bias */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase">Bias</label>
+              <label className="block text-xs text-gray-500 mb-1 uppercase">{t('filterBias')}</label>
               <select
                 value={filters.bias || ''}
                 onChange={(e) => updateFilter('bias', e.target.value)}
                 className="input-field text-sm"
               >
-                <option value="">All</option>
-                <option value="Super Bullish">Super Bullish</option>
-                <option value="Bullish">Bullish</option>
-                <option value="Range Bound">Range Bound</option>
-                <option value="Bearish">Bearish</option>
-                <option value="Super Bearish">Super Bearish</option>
+                <option value="">{t('filterAll')}</option>
+                <option value="Super Bullish">{t('superBullish')}</option>
+                <option value="Bullish">{t('bullish')}</option>
+                <option value="Range Bound">{t('rangeBound')}</option>
+                <option value="Bearish">{t('bearish')}</option>
+                <option value="Super Bearish">{t('superBearish')}</option>
               </select>
             </div>
 
             {/* Prepared */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase">Preparation</label>
+              <label className="block text-xs text-gray-500 mb-1 uppercase">{t('filterPreparation')}</label>
               <select
                 value={filters.prepared === undefined ? '' : filters.prepared ? 'yes' : 'no'}
                 onChange={(e) => {
@@ -138,16 +140,16 @@ export default function QueryPanel({ filters, onFilterChange }) {
                 }}
                 className="input-field text-sm"
               >
-                <option value="">All</option>
-                <option value="yes">Prepared</option>
-                <option value="no">Unprepared</option>
+                <option value="">{t('filterAll')}</option>
+                <option value="yes">{t('filterPrepared')}</option>
+                <option value="no">{t('filterUnprepared')}</option>
               </select>
             </div>
           </div>
 
           {activeFilterCount > 0 && (
             <button onClick={clearFilters} className="btn-ghost text-xs mt-3">
-              Clear All Filters
+              {t('clearFilters')}
             </button>
           )}
         </div>

@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useStockPlan } from '../../hooks/useStockPlan';
+import { useLanguage } from '../../hooks/useLanguage';
 import { EXECUTION_STATUSES, TIMEFRAMES, STOCK_PLAN_BIAS_TAGS } from '../../../shared/constants';
+import { BIAS_KEY_MAP } from '../../../shared/i18n';
 import StockPlanCard from './StockPlanCard';
 import StockPlanDetail from './StockPlanDetail';
 
 export default function StockPlanGallery() {
   const { searchPlans, deletePlan } = useStockPlan();
+  const { t } = useLanguage();
 
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +55,7 @@ export default function StockPlanGallery() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by stock name..."
+              placeholder={t('searchByStock')}
               className="input-field text-sm pl-9 w-full"
             />
           </div>
@@ -62,9 +65,9 @@ export default function StockPlanGallery() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="input-field text-sm w-auto"
           >
-            <option value="">All Status</option>
+            <option value="">{t('allStatus')}</option>
             {EXECUTION_STATUSES.map((s) => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s}>{t(s.toLowerCase())}</option>
             ))}
           </select>
 
@@ -73,7 +76,7 @@ export default function StockPlanGallery() {
             onChange={(e) => setTimeframeFilter(e.target.value)}
             className="input-field text-sm w-auto"
           >
-            <option value="">All Timeframes</option>
+            <option value="">{t('allTimeframes')}</option>
             {TIMEFRAMES.map((tf) => (
               <option key={tf} value={tf}>{tf}</option>
             ))}
@@ -84,9 +87,9 @@ export default function StockPlanGallery() {
             onChange={(e) => setBiasFilter(e.target.value)}
             className="input-field text-sm w-auto"
           >
-            <option value="">All Biases</option>
+            <option value="">{t('allBiases')}</option>
             {STOCK_PLAN_BIAS_TAGS.map((b) => (
-              <option key={b} value={b}>{b}</option>
+              <option key={b} value={b}>{t(BIAS_KEY_MAP[b])}</option>
             ))}
           </select>
         </div>

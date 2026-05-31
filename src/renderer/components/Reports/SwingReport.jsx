@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../../hooks/useLanguage';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, LabelList,
@@ -61,26 +62,28 @@ function Empty({ msg }) {
 
 // ── Custom tooltips ───────────────────────────────────────────────────────────
 function StatusTooltip({ active, payload }) {
+  const { t } = useLanguage();
   if (!active || !payload?.length) return null;
   return (
     <div style={TT} className="text-xs">
       <span className="text-gray-400">{payload[0].name}: </span>
-      <span className="text-gray-200 font-semibold">{payload[0].value} plans</span>
+      <span className="text-gray-200 font-semibold">{payload[0].value} {t('plansUnit')}</span>
     </div>
   );
 }
 
 function TFTooltip({ active, payload, label }) {
+  const { t } = useLanguage();
   if (!active || !payload?.length) return null;
   const closed = payload
-    .filter((p) => ['Pass','Fail','Partial'].includes(p.name))
+    .filter((p) => ['Pass', 'Fail', 'Partial'].includes(p.dataKey))
     .reduce((s, p) => s + (p.value || 0), 0);
-  const passVal = payload.find((p) => p.name === 'Pass')?.value || 0;
+  const passVal = payload.find((p) => p.dataKey === 'Pass')?.value || 0;
   return (
     <div style={TT} className="text-xs space-y-1 min-w-[130px]">
       <p className="font-semibold text-gray-200 mb-1.5">{label}</p>
       {payload.map((p) => p.value > 0 && (
-        <div key={p.name} className="flex items-center gap-2">
+        <div key={p.dataKey} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.fill }} />
           <span className="text-gray-400">{p.name}:</span>
           <span className="text-gray-200 font-medium ml-auto pl-2">{p.value}</span>
@@ -88,7 +91,7 @@ function TFTooltip({ active, payload, label }) {
       ))}
       {closed > 0 && (
         <div className="border-t border-gray-700 pt-1 mt-1 flex justify-between">
-          <span className="text-gray-500">Win Rate:</span>
+          <span className="text-gray-500">{t('winRate')}:</span>
           <span className="text-emerald-400 font-semibold">{pct(passVal, closed)}%</span>
         </div>
       )}
@@ -108,6 +111,7 @@ function WinRateLabel({ x, y, width, height, value }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function SwingReport() {
+  const { t } = useLanguage();
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
@@ -123,7 +127,7 @@ export default function SwingReport() {
   (data?.statusBreakdown || []).forEach((r) => { statusMap[r.status] = r.count; });
 
   const donutSlices = STATUS_ORDER
-    .map((s) => ({ name: s, value: statusMap[s] || 0, color: C[s.toLowerCase()] }))
+    .map((s) => ({ name: t(s.toLowerCase()), value: statusMap[s] || 0, color: C[s.toLowerCase()], key: s }))
     .filter((s) => s.value > 0);
 
   const totalPlans = donutSlices.reduce((s, d) => s + d.value, 0);
@@ -145,11 +149,11 @@ export default function SwingReport() {
     };
   });
 
-  const t = data?.totals || {};
-  const closedTotal = (t.pass || 0) + (t.fail || 0) + (t.partial || 0);
-  const overallWin  = pct(t.pass || 0, closedTotal);
+  const totals = data?.totals || {};
+  const closedTotal = (totals.pass || 0) + (totals.fail || 0) + (totals.partial || 0);
+  const overallWin  = pct(totals.pass || 0, closedTotal);
 
-  if (loading) return <div className="flex items-center justify-center py-32 text-gray-500 text-sm">Loading report…</div>;
+  if (loading) return <div className="flex items-center justify-center py-32 text-gray-500 text-sm">{t('loadingReport')}</div>;
   if (error)   return <div className="flex items-center justify-center py-32 text-red-400 text-sm">{error}</div>;
 
   return (
@@ -160,7 +164,7 @@ export default function SwingReport() {
 
         {/* Donut with CSS-overlay center label */}
         <div className="col-span-2 glass-card p-5">
-          <h4 className="text-sm font-semibold text-gray-200">Execution Status Overview</h4>
+          <h4 className="text-sm font-semibold text-gray-200">{t('executionOverview')}</h4>
           <ChartQuestion text='"How are my swing trades resolving overall?"' />
           {donutSlices.length === 0
             ? <Empty msg="No swing plans yet" />
@@ -179,7 +183,7 @@ export default function SwingReport() {
                 <div className="absolute top-0 left-0 right-0 flex justify-center" style={{ top: '20%', pointerEvents: 'none' }}>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-gray-100">{totalPlans}</div>
-                    <div className="text-xs text-gray-500">plans</div>
+                    <div className="text-xs text-gray-500">{t('plansUnit')}</div>
                   </div>
                 </div>
               </div>
@@ -190,18 +194,18 @@ export default function SwingReport() {
         {/* KPI cards */}
         <div className="col-span-3 grid grid-rows-3 gap-4">
           <KPICard
-            label="Total Swing Plans"
-            value={t.total || 0}
+            label={t('totalSwingPlans')}
+            value={totals.total || 0}
             sub="plans created across all timeframes"
           />
           <KPICard
-            label="Overall Win Rate"
+            label={t('overallWinRate')}
             value={`${overallWin}%`}
             sub="Pass ÷ (Pass + Fail + Partial)"
             color={overallWin >= 60 ? 'text-emerald-400' : overallWin >= 40 ? 'text-amber-400' : 'text-red-400'}
           />
           <KPICard
-            label="Still Open"
+            label={t('stillOpen')}
             value={statusMap['Waiting'] || 0}
             sub="plans currently in Waiting status"
             color="text-primary-400"
@@ -211,7 +215,7 @@ export default function SwingReport() {
 
       {/* ── Chart 2: Timeframe Performance ── */}
       <div className="glass-card p-5">
-        <h4 className="text-sm font-semibold text-gray-200">Performance by Timeframe</h4>
+        <h4 className="text-sm font-semibold text-gray-200">{t('performanceByTF')}</h4>
         <ChartQuestion text='"Which timeframe do I execute best in?"' />
         {tfData.length === 0
           ? <Empty msg="No timeframe data yet" />
@@ -223,11 +227,11 @@ export default function SwingReport() {
                 <YAxis type="category" dataKey="timeframe" tick={{ fill: '#d1d5db', fontSize: 12 }} axisLine={false} tickLine={false} width={56} />
                 <Tooltip content={<TFTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                 <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} formatter={(v) => <span style={{ color: '#9ca3af' }}>{v}</span>} />
-                <Bar dataKey="Pass"      stackId="s" fill={C.pass}      maxBarSize={22} radius={0} />
-                <Bar dataKey="Partial"   stackId="s" fill={C.partial}   maxBarSize={22} radius={0} />
-                <Bar dataKey="Fail"      stackId="s" fill={C.fail}      maxBarSize={22} radius={0} />
-                <Bar dataKey="Cancelled" stackId="s" fill={C.cancelled} maxBarSize={22} radius={0} />
-                <Bar dataKey="Waiting"   stackId="s" fill={C.waiting}   maxBarSize={22} radius={[0,4,4,0]}>
+                <Bar dataKey="Pass"      name={t('pass')}      stackId="s" fill={C.pass}      maxBarSize={22} radius={0} />
+                <Bar dataKey="Partial"   name={t('partial')}   stackId="s" fill={C.partial}   maxBarSize={22} radius={0} />
+                <Bar dataKey="Fail"      name={t('fail')}      stackId="s" fill={C.fail}      maxBarSize={22} radius={0} />
+                <Bar dataKey="Cancelled" name={t('cancelled')} stackId="s" fill={C.cancelled} maxBarSize={22} radius={0} />
+                <Bar dataKey="Waiting"   name={t('waiting')}   stackId="s" fill={C.waiting}   maxBarSize={22} radius={[0,4,4,0]}>
                   <LabelList dataKey="winRate" content={WinRateLabel} position="right" />
                 </Bar>
               </BarChart>
