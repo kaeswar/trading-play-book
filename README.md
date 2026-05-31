@@ -44,21 +44,21 @@ Go to the [**Releases**](../../releases/latest) page and download one of:
 
 | File | When to use |
 |------|-------------|
-| `Trading Play Book Setup 1.1.0.exe` | **Recommended** — installs the app, creates Start Menu & Desktop shortcuts |
-| `Trading Play Book 1.1.0.exe` | **Portable** — run directly without installing, no admin rights needed |
+| `Trading Play Book Setup 1.2.0.exe` | **Recommended** — installs the app, creates Start Menu & Desktop shortcuts |
+| `Trading Play Book 1.2.0.exe` | **Portable** — run directly without installing, no admin rights needed |
 
 ---
 
 ## Installation
 
 ### Installer (recommended)
-1. Download `Trading Play Book Setup 1.1.0.exe`
+1. Download `Trading Play Book Setup 1.2.0.exe`
 2. Run the installer — Windows may show a SmartScreen warning (see note below)
 3. Choose your install folder (default: `C:\Program Files\Trading Play Book`)
 4. Launch from the Desktop shortcut or Start Menu
 
 ### Portable
-1. Download `Trading Play Book 1.1.0.exe`
+1. Download `Trading Play Book 1.2.0.exe`
 2. Place it in any folder you prefer
 3. Double-click to run — no installation needed
 
@@ -98,6 +98,16 @@ Screenshots you attach are stored at their **original location** on your drive �
 ---
 
 ## Release History
+
+### v1.2.0
+- Gallery: verdict tags on every day card (Verdict Pending for unreviewed days, custom plan Pass/Fail badges)
+- Gallery: explicit View and Remove buttons on each card (no longer hover-only)
+- Gallery filters: Bias filter now includes Super Bullish, Range Bound, Super Bearish; works for custom plans
+- Gallery filters: Preparation filter now covers custom plan days
+- Gallery filters: Outcome renamed to Outcome / Verdict — covers both default plan outcomes and custom plan verdicts (Pass/Fail/Partial/Cancelled)
+- Post-Market: Default Plan Verdict and Custom Plan Verdict shown as clearly separated sections with visual hierarchy
+- Left panel nav: descriptive subtitles on all nav items (Create/Edit plans, Update Plan's Result, etc.)
+- Backup / Restore: intraday notes are now deduplicated on restore — safe to restore multiple times
 
 ### v1.1.0
 - Swing Plans: added Plan Date field

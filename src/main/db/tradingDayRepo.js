@@ -159,7 +159,11 @@ module.exports = {
          JOIN outcome_plan op ON op.possibility_id = p.id
          JOIN screenshot ss ON ss.outcome_plan_id = op.id
          WHERE p.trading_day_id = td.id
-        ) as screenshot_paths
+        ) as screenshot_paths,
+        (SELECT GROUP_CONCAT(cp.verdict_status, '||')
+         FROM custom_plan cp
+         WHERE cp.trading_day_id = td.id AND cp.verdict_status IS NOT NULL
+        ) as custom_plan_verdicts
       FROM trading_day td
       JOIN symbol s ON td.symbol_id = s.id
       LEFT JOIN verdict v ON v.trading_day_id = td.id
@@ -188,19 +192,29 @@ module.exports = {
     }
 
     if (filters.outcome) {
-      sql += ' AND v.outcome = ?';
-      params.push(filters.outcome);
+      sql += ` AND (v.outcome = ? OR EXISTS (
+        SELECT 1 FROM custom_plan cp
+        WHERE cp.trading_day_id = td.id AND cp.verdict_status = ?
+      ))`;
+      params.push(filters.outcome, filters.outcome);
     }
 
     if (filters.bias) {
-      sql += ' AND v.bias = ?';
-      params.push(filters.bias);
+      sql += ` AND (v.bias = ? OR EXISTS (
+        SELECT 1 FROM custom_plan cp
+        WHERE cp.trading_day_id = td.id AND cp.bias_tag = ?
+      ))`;
+      params.push(filters.bias, filters.bias);
     }
 
     if (filters.prepared === true) {
-      sql += ' AND v.had_plan = 1';
+      sql += ` AND (v.had_plan = 1 OR EXISTS (
+        SELECT 1 FROM custom_plan cp WHERE cp.trading_day_id = td.id
+      ))`;
     } else if (filters.prepared === false) {
-      sql += ' AND v.had_plan = 0';
+      sql += ` AND (v.had_plan = 0 OR (v.had_plan IS NULL AND NOT EXISTS (
+        SELECT 1 FROM custom_plan cp WHERE cp.trading_day_id = td.id
+      )))`;
     }
 
     sql += ' ORDER BY td.trade_date DESC, s.name';

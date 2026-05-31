@@ -297,6 +297,11 @@ function importBackup(db, userData, filePath) {
 }
 
 function insertNote(db, note, ids, img, tradeDate, now, stats) {
+  const existing = db.prepare(
+    'SELECT id FROM intraday_note WHERE trading_day_id = ? AND outcome_plan_id IS ? AND custom_plan_id IS ? AND created_at = ?'
+  ).get(ids.tradingDayId, ids.outcomePlanId || null, ids.customPlanId || null, note.created_at);
+  if (existing) return;
+
   const id = db.prepare(
     'INSERT INTO intraday_note (trading_day_id, outcome_plan_id, custom_plan_id, note_time, action, status, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(

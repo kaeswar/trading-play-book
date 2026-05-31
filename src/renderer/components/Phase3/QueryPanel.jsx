@@ -85,18 +85,25 @@ export default function QueryPanel({ filters, onFilterChange }) {
               </select>
             </div>
 
-            {/* Outcome */}
+            {/* Outcome / Verdict */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase">Outcome</label>
+              <label className="block text-xs text-gray-500 mb-1 uppercase">Outcome / Verdict</label>
               <select
                 value={filters.outcome || ''}
                 onChange={(e) => updateFilter('outcome', e.target.value)}
                 className="input-field text-sm"
               >
                 <option value="">All</option>
-                {OUTCOMES.map((oc) => (
-                  <option key={oc} value={oc}>{oc}</option>
-                ))}
+                <optgroup label="Default Plan">
+                  <option value="Accepted">Accepted</option>
+                  <option value="Rejected">Rejected</option>
+                </optgroup>
+                <optgroup label="Custom Plan">
+                  <option value="Pass">Pass</option>
+                  <option value="Fail">Fail</option>
+                  <option value="Partial">Partial</option>
+                  <option value="Cancelled">Cancelled</option>
+                </optgroup>
               </select>
             </div>
 
@@ -109,8 +116,11 @@ export default function QueryPanel({ filters, onFilterChange }) {
                 className="input-field text-sm"
               >
                 <option value="">All</option>
+                <option value="Super Bullish">Super Bullish</option>
                 <option value="Bullish">Bullish</option>
+                <option value="Range Bound">Range Bound</option>
                 <option value="Bearish">Bearish</option>
+                <option value="Super Bearish">Super Bearish</option>
               </select>
             </div>
 

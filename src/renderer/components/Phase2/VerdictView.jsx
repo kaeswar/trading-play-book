@@ -116,59 +116,60 @@ export default function VerdictView() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-200 flex items-center gap-2">
-            End-of-Day Verdict
-          </h2>
-          <p className="text-xs text-gray-500 mt-1">
-            {selectedSymbol.name} &middot; {formatDate(selectedDate)}
-          </p>
+
+      {/* ── Section 1: Default Plan Verdict ── */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-10 rounded-full bg-gradient-to-b from-primary-400 to-primary-600 flex-shrink-0"></div>
+            <div>
+              <h3 className="text-base font-semibold text-gray-100">Default Plan Verdict</h3>
+              <p className="text-[10px] text-gray-500 mt-0.5">
+                {selectedSymbol.name} &middot; {formatDate(selectedDate)} &middot; Opening scenario outcome
+              </p>
+            </div>
+          </div>
+          {verdict && !showForm && (
+            <button onClick={() => setShowForm(true)} className="btn-secondary text-sm">
+              Edit Verdict
+            </button>
+          )}
         </div>
-        {verdict && !showForm && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="btn-secondary text-sm"
-          >
-            Edit Verdict
-          </button>
-        )}
+
+        <div className="pl-4">
+          {(!verdict || showForm) ? (
+            <div className="card">
+              <VerdictForm
+                tradingDay={tradingDay}
+                existingVerdict={verdict}
+                existingScreenshots={verdictScreenshots}
+                onSave={handleSaveVerdict}
+                onCancel={verdict ? () => setShowForm(false) : null}
+              />
+            </div>
+          ) : (
+            <VerdictDisplay verdict={verdict} screenshots={verdictScreenshots} />
+          )}
+        </div>
       </div>
 
-      {/* Show form if no verdict or user clicked edit */}
-      {(!verdict || showForm) ? (
-        <div className="card">
-          <VerdictForm
-            tradingDay={tradingDay}
-            existingVerdict={verdict}
-            existingScreenshots={verdictScreenshots}
-            onSave={handleSaveVerdict}
-            onCancel={verdict ? () => setShowForm(false) : null}
-          />
-        </div>
-      ) : (
-        <VerdictDisplay
-          verdict={verdict}
-          screenshots={verdictScreenshots}
-        />
-      )}
-
-      {/* Custom Plan Verdicts */}
+      {/* ── Section 2: Custom Plan Verdict ── */}
       {customPlans.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-gradient-to-r from-purple-500 to-fuchsia-500"></div>
-            <h3 className="text-sm font-medium text-gray-300">Custom Plan Verdicts</h3>
-            <span className="text-[10px] text-gray-500">({customPlans.length})</span>
+        <div>
+          <div className="flex items-center gap-3 mb-4 pt-4 border-t border-surface-600/50">
+            <div className="w-1 h-10 rounded-full bg-gradient-to-b from-purple-500 to-fuchsia-500 flex-shrink-0"></div>
+            <div>
+              <h3 className="text-base font-semibold text-gray-100">Custom Plan Verdict</h3>
+              <p className="text-[10px] text-gray-500 mt-0.5">
+                {customPlans.length} custom plan{customPlans.length > 1 ? 's' : ''} &middot; Mark each plan's result
+              </p>
+            </div>
           </div>
-          {customPlans.map((plan) => (
-            <CustomPlanVerdictCard
-              key={plan.id}
-              plan={plan}
-              onVerdictUpdate={loadDay}
-            />
-          ))}
+          <div className="pl-4 space-y-3">
+            {customPlans.map((plan) => (
+              <CustomPlanVerdictCard key={plan.id} plan={plan} onVerdictUpdate={loadDay} />
+            ))}
+          </div>
         </div>
       )}
     </div>
