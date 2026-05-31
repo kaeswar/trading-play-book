@@ -548,8 +548,10 @@ function PossibilityOutcomeGroup({ possibility, verdict, noteCounts, onSelectOut
 
   if (plannedOutcomes.length === 0) return null;
 
+  const hasAnyNotes = plannedOutcomes.some(op => (noteCounts[op.id] || 0) > 0);
+
   return (
-    <div className={`mb-4 ${verdict && !isVerdict ? 'opacity-40 hover:opacity-70 transition-opacity' : ''}`}>
+    <div className={`mb-4 ${verdict && !isVerdict && !hasAnyNotes ? 'opacity-40 hover:opacity-70 transition-opacity' : ''}`}>
       <div className="flex items-center gap-2 mb-1">
         <span className={`badge text-[10px] ${biasColor.bg} ${biasColor.text} border ${biasColor.border}`}>{possibility.bias}</span>
         <span className="text-sm font-medium text-gray-300">{formatPossibilityCode(possibility.code)}</span>
@@ -570,7 +572,7 @@ function PossibilityOutcomeGroup({ possibility, verdict, noteCounts, onSelectOut
             <div
               key={op.id}
               className={`glass-card p-4 space-y-3 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all ${
-                isVerdictOutcome ? 'ring-2 ring-primary-500/50' : verdict ? 'opacity-40 hover:opacity-70' : ''
+                isVerdictOutcome ? 'ring-2 ring-primary-500/50' : (verdict && !noteCount) ? 'opacity-40 hover:opacity-70' : ''
               }`}
               onClick={() => onSelectOutcome(op)}
             >

@@ -56,6 +56,7 @@ export const BEHAVIOR_TAGS = {
   'Super Bullish': { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30' },
   'Bullish (Medium)': { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/30' },
   'Bullish': { bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500/30' },
+  'Neutral': { bg: 'bg-gray-500/20', text: 'text-gray-300', border: 'border-gray-500/30' },
   'Double Side Auction': { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30' },
   'Suspect Bearish': { bg: 'bg-orange-500/20', text: 'text-orange-400', border: 'border-orange-500/30' },
   'Medium Bearish': { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30' },
@@ -95,13 +96,12 @@ export const EXECUTION_STATUS_COLORS = {
   Waiting: { bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500/30' },
 };
 
-// Custom Plan bias tags (subset of behavior tags for tagging custom plans)
+// Custom Plan bias tags
 export const CUSTOM_PLAN_BIAS_TAGS = [
   'Super Bullish',
-  'Bullish (Medium)',
   'Bullish',
+  'Neutral',
   'Bearish',
-  'Medium Bearish',
   'Super Bearish',
 ];
 
@@ -115,7 +115,7 @@ export const CUSTOM_VERDICT_COLORS = {
   Cancelled: { bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/30' },
 };
 
-export const TIMEFRAMES = ['Weekly', 'Daily'];
+export const TIMEFRAMES = ['Monthly', 'Weekly', 'Daily', '4Hrs', '1Hrs'];
 
 // Intraday Note statuses (ordered bullish → bearish)
 export const INTRADAY_STATUSES = [

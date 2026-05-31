@@ -6,7 +6,6 @@ import {
   INTRADAY_STATUS_KEYS,
   INTRADAY_TIME_OPTIONS,
   BEHAVIOR_TAGS,
-  OUTCOME_COLORS,
   CUSTOM_VERDICT_COLORS,
   BIAS_COLORS,
   POSSIBILITIES,
@@ -229,11 +228,15 @@ export default function IntradayNotesModal({ entry, tradingDay, customPlans, sym
   const biasColors = entry.possibilityBias ? BIAS_COLORS[entry.possibilityBias] : null;
   const screenshots = entry.screenshots || [];
 
-  /* ── Note count indicator ── */
-  const attachedCount = notes.filter(n =>
+  /* ── Journey view: only show the full timeline once this outcome has been activated
+        (has at least one note). If untouched, show empty so the user knows to start here. ── */
+  const thisOutcomeHasNotes = notes.some(n =>
     (entry.outcomePlanId && n.outcome_plan_id === entry.outcomePlanId) ||
     (entry.customPlanId && n.custom_plan_id === entry.customPlanId)
-  ).length;
+  );
+  const displayedNotes = thisOutcomeHasNotes
+    ? notes.filter(n => n.outcome_plan_id !== null || n.custom_plan_id !== null)
+    : [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
@@ -258,7 +261,7 @@ export default function IntradayNotesModal({ entry, tradingDay, customPlans, sym
               <span className="text-sm font-semibold text-gray-200">Intra Day Notes</span>
               {/* Day-level badge */}
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-700 text-gray-400 border border-surface-600/50">
-                All Day · {notes.length} note{notes.length !== 1 ? 's' : ''}
+                {displayedNotes.length} note{displayedNotes.length !== 1 ? 's' : ''}
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -323,11 +326,6 @@ export default function IntradayNotesModal({ entry, tradingDay, customPlans, sym
                 <span className="text-xs font-bold text-red-400">{entry.stopOut}</span>
               </span>
             )}
-            {attachedCount > 0 && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
-                {attachedCount} attached here
-              </span>
-            )}
           </div>
         </div>
 
@@ -383,7 +381,7 @@ export default function IntradayNotesModal({ entry, tradingDay, customPlans, sym
                 <div className="flex items-center justify-center py-12">
                   <div className="w-6 h-6 border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
                 </div>
-              ) : notes.length === 0 ? (
+              ) : displayedNotes.length === 0 ? (
                 viewOnly ? (
                   <div className="flex items-center justify-center h-full select-none pointer-events-none">
                     <p className="text-4xl font-bold text-surface-600/60 text-center leading-snug tracking-wide">
@@ -395,8 +393,8 @@ export default function IntradayNotesModal({ entry, tradingDay, customPlans, sym
                     <svg className="w-10 h-10 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
-                    <p className="text-gray-500 text-sm">No intraday notes yet</p>
-                    <p className="text-gray-600 text-xs">Click "Add Note" to start — notes are shared across all outcomes for this day</p>
+                    <p className="text-gray-500 text-sm">No notes for today's plan yet</p>
+                    <p className="text-gray-600 text-xs">Click "Add Note" — notes attached to any outcome will appear here</p>
                   </div>
                 )
               ) : (
@@ -412,7 +410,7 @@ export default function IntradayNotesModal({ entry, tradingDay, customPlans, sym
                       </tr>
                     </thead>
                     <tbody>
-                      {notes.map(note => viewOnly ? (
+                      {displayedNotes.map(note => viewOnly ? (
                         <NoteRowReadOnly key={note.id} note={note} />
                       ) : (
                         <NoteRow

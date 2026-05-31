@@ -38,6 +38,41 @@ function initializeDatabase() {
     }
   } catch (_) { /* table doesn't exist yet */ }
 
+  // Migrate custom_plan: remap old bias_tag values to new 5-tag set
+  try {
+    const cpSql = database.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='custom_plan'").get();
+    if (cpSql && cpSql.sql.includes("'Bullish (Medium)'")) {
+      database.pragma('foreign_keys = OFF');
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS custom_plan_new (
+          id              INTEGER PRIMARY KEY AUTOINCREMENT,
+          trading_day_id  INTEGER NOT NULL REFERENCES trading_day(id) ON DELETE CASCADE,
+          title           TEXT NOT NULL DEFAULT '',
+          trade_plan      TEXT NOT NULL DEFAULT '',
+          bias_tag        TEXT CHECK(bias_tag IN ('Super Bullish','Bullish','Neutral','Bearish','Super Bearish') OR bias_tag IS NULL),
+          target          REAL,
+          stop_out        REAL,
+          verdict_status  TEXT CHECK(verdict_status IN ('Pass', 'Fail', 'Partial', 'Cancelled') OR verdict_status IS NULL),
+          verdict_notes   TEXT,
+          created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO custom_plan_new
+          SELECT id, trading_day_id, title, trade_plan,
+            CASE bias_tag
+              WHEN 'Bullish (Medium)' THEN 'Bullish'
+              WHEN 'Medium Bearish'   THEN 'Bearish'
+              ELSE bias_tag
+            END,
+            target, stop_out, verdict_status, verdict_notes, created_at, updated_at
+          FROM custom_plan;
+        DROP TABLE custom_plan;
+        ALTER TABLE custom_plan_new RENAME TO custom_plan;
+      `);
+      database.pragma('foreign_keys = ON');
+    }
+  } catch (_) { /* table doesn't exist yet */ }
+
   // Migrate intraday_note: add trading_day_id for day-level notes
   try {
     const intradayNoteCols = database.prepare("PRAGMA table_info(intraday_note)").all();
@@ -107,6 +142,53 @@ function initializeDatabase() {
     }
   } catch (_) { /* table doesn't exist yet */ }
 
+  // Migrate stock_plan: add symbol_id FK pointing to the symbol table
+  try {
+    const stockPlanCols = database.prepare("PRAGMA table_info(stock_plan)").all();
+    if (stockPlanCols.length > 0 && !stockPlanCols.some(c => c.name === 'symbol_id')) {
+      // Create a symbol row for any stock_name that doesn't already have one
+      const distinctNames = database.prepare("SELECT DISTINCT stock_name FROM stock_plan").all();
+      const insertSym = database.prepare("INSERT OR IGNORE INTO symbol (name) VALUES (?)");
+      database.transaction(() => {
+        for (const { stock_name } of distinctNames) insertSym.run(stock_name);
+      })();
+      // Add the FK column and backfill
+      database.exec("ALTER TABLE stock_plan ADD COLUMN symbol_id INTEGER REFERENCES symbol(id)");
+      database.exec(`
+        UPDATE stock_plan
+        SET symbol_id = (SELECT id FROM symbol WHERE symbol.name = stock_plan.stock_name)
+      `);
+    }
+  } catch (_) { /* stock_plan doesn't exist yet — will be created below with symbol_id */ }
+
+  // Migrate stock_plan: expand timeframe CHECK to include Monthly, 4Hrs, 1Hrs
+  try {
+    const spSql = database.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='stock_plan'").get();
+    if (spSql && !spSql.sql.includes("'4Hrs'")) {
+      database.pragma('foreign_keys = OFF');
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS stock_plan_new (
+          id               INTEGER PRIMARY KEY AUTOINCREMENT,
+          symbol_id        INTEGER REFERENCES symbol(id),
+          stock_name       TEXT NOT NULL,
+          timeframe        TEXT NOT NULL CHECK(timeframe IN ('Monthly', 'Weekly', 'Daily', '4Hrs', '1Hrs')),
+          analysis         TEXT,
+          entry_price      REAL,
+          target_price     REAL,
+          stop_loss        REAL,
+          chart_path       TEXT,
+          execution_status TEXT CHECK(execution_status IN ('Pass', 'Fail', 'Partial', 'Cancelled', 'Waiting') OR execution_status IS NULL),
+          created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO stock_plan_new SELECT id, symbol_id, stock_name, timeframe, analysis, entry_price, target_price, stop_loss, chart_path, execution_status, created_at, updated_at FROM stock_plan;
+        DROP TABLE stock_plan;
+        ALTER TABLE stock_plan_new RENAME TO stock_plan;
+      `);
+      database.pragma('foreign_keys = ON');
+    }
+  } catch (_) { /* stock_plan doesn't exist yet */ }
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS symbol (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -175,8 +257,9 @@ function initializeDatabase() {
 
     CREATE TABLE IF NOT EXISTS stock_plan (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      symbol_id        INTEGER REFERENCES symbol(id),
       stock_name       TEXT NOT NULL,
-      timeframe        TEXT NOT NULL CHECK(timeframe IN ('Weekly', 'Daily')),
+      timeframe        TEXT NOT NULL CHECK(timeframe IN ('Monthly', 'Weekly', 'Daily', '4Hrs', '1Hrs')),
       analysis         TEXT,
       entry_price      REAL,
       target_price     REAL,
@@ -195,7 +278,7 @@ function initializeDatabase() {
       trading_day_id  INTEGER NOT NULL REFERENCES trading_day(id) ON DELETE CASCADE,
       title           TEXT NOT NULL DEFAULT '',
       trade_plan      TEXT NOT NULL DEFAULT '',
-      bias_tag        TEXT CHECK(bias_tag IN ('Super Bullish','Bullish (Medium)','Bullish','Bearish','Medium Bearish','Super Bearish') OR bias_tag IS NULL),
+      bias_tag        TEXT CHECK(bias_tag IN ('Super Bullish','Bullish','Neutral','Bearish','Super Bearish') OR bias_tag IS NULL),
       target          REAL,
       stop_out        REAL,
       verdict_status  TEXT CHECK(verdict_status IN ('Pass', 'Fail', 'Partial', 'Cancelled') OR verdict_status IS NULL),

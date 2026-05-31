@@ -1,0 +1,241 @@
+import React, { useState, useEffect } from 'react';
+import { useApp } from '../../store/appStore';
+import {
+  ComposedChart, Bar, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell,
+} from 'recharts';
+
+// ── Theme constants ───────────────────────────────────────────────────────────
+const GRID  = '#1f2937';
+const AXIS  = '#6b7280';
+const TT    = { backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '8px', padding: '8px 12px' };
+
+const C = {
+  total:     '#374151',
+  planned:   '#6366f1',
+  planRate:  '#a78bfa',
+  accepted:  '#10b981',
+  rejected:  '#ef4444',
+  noPlan:    '#f59e0b',
+  noVerdict: '#4b5563',
+};
+
+// ── Tiny helpers ──────────────────────────────────────────────────────────────
+function fmtMonth(m) {
+  if (!m) return '';
+  const [y, mo] = m.split('-');
+  return new Date(+y, +mo - 1, 1).toLocaleString('en', { month: 'short' }) + " '" + y.slice(2);
+}
+
+function pct(num, den) {
+  if (!den) return 0;
+  return Math.round(((num || 0) / den) * 100);
+}
+
+// ── Shared tiny components ────────────────────────────────────────────────────
+function ChartQuestion({ text }) {
+  return (
+    <div className="flex items-start gap-2 mt-1 mb-4">
+      <div className="w-0.5 self-stretch bg-primary-500/50 rounded-full flex-shrink-0 min-h-[1.2rem]" />
+      <p className="text-xs text-primary-300/75 italic leading-relaxed">{text}</p>
+    </div>
+  );
+}
+
+function KPICard({ label, value, sub, color = 'text-gray-100' }) {
+  return (
+    <div className="glass-card p-4 space-y-1">
+      <span className="block text-xs text-gray-500 uppercase tracking-wider">{label}</span>
+      <span className={`block text-2xl font-bold ${color}`}>{value}</span>
+      {sub && <span className="block text-xs text-gray-600 leading-relaxed">{sub}</span>}
+    </div>
+  );
+}
+
+function Empty({ msg }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 text-gray-600 gap-2">
+      <svg className="w-8 h-8 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+      <span className="text-sm">{msg}</span>
+    </div>
+  );
+}
+
+// ── Custom tooltips ───────────────────────────────────────────────────────────
+function MonthTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={TT} className="text-xs space-y-1 min-w-[140px]">
+      <p className="font-semibold text-gray-200 mb-1.5">{label}</p>
+      {payload.map((p) => (
+        <div key={p.name} className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
+          <span className="text-gray-400">{p.name}:</span>
+          <span className="text-gray-200 font-medium ml-auto pl-2">
+            {p.name === 'Plan Rate' ? `${p.value}%` : p.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DonutTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={TT} className="text-xs">
+      <span className="text-gray-400">{payload[0].name}: </span>
+      <span className="text-gray-200 font-semibold">{payload[0].value} days</span>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+export default function IntradayReport() {
+  const { symbols } = useApp();
+  const [symbolId, setSymbolId] = useState(null);
+  const [data, setData]         = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(null);
+
+  // Default to Nifty once symbols load
+  useEffect(() => {
+    if (symbols.length > 0 && symbolId === null) {
+      const nifty = symbols.find((s) => s.name.toLowerCase() === 'nifty') || symbols[0];
+      setSymbolId(nifty.id);
+    }
+  }, [symbols]);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    window.api.report.intraday(symbolId)
+      .then((d) => { setData(d); setLoading(false); })
+      .catch((e) => { setError(e.message || 'Failed to load report'); setLoading(false); });
+  }, [symbolId]);
+
+  // ── Derived data ──
+  const monthly = (data?.monthly || []).map((r) => ({
+    ...r,
+    label:    fmtMonth(r.month),
+    planRate: pct(r.plannedDays, r.verdictDays),
+  }));
+
+  const bd = data?.breakdown || {};
+  const totalDays   = bd.totalDays  || 0;
+  const prepRate    = pct(bd.plannedDays,  bd.verdictDays);
+  const successRate = pct(bd.accepted, (bd.accepted || 0) + (bd.rejected || 0));
+
+  const donutSlices = [
+    { name: 'Accepted',   value: bd.accepted  || 0, color: C.accepted  },
+    { name: 'Rejected',   value: bd.rejected  || 0, color: C.rejected  },
+    { name: 'No Plan',    value: bd.noPlan    || 0, color: C.noPlan    },
+    { name: 'No Verdict', value: bd.noVerdict || 0, color: C.noVerdict },
+  ].filter((s) => s.value > 0);
+
+  const xInterval = monthly.length > 12 ? Math.floor(monthly.length / 10) : 0;
+
+  if (loading) return <div className="flex items-center justify-center py-32 text-gray-500 text-sm">Loading report…</div>;
+  if (error)   return <div className="flex items-center justify-center py-32 text-red-400 text-sm">{error}</div>;
+
+  return (
+    <div className="space-y-6">
+
+      {/* Symbol filter */}
+      <div className="flex items-center justify-end gap-2">
+        <span className="text-xs text-gray-500">Symbol</span>
+        <select
+          value={symbolId || ''}
+          onChange={(e) => setSymbolId(e.target.value ? Number(e.target.value) : null)}
+          className="input-field text-xs py-1 w-auto"
+        >
+          <option value="">All Symbols</option>
+          {symbols.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+      </div>
+
+      {/* ── Chart 1: Monthly Activity ── */}
+      <div className="glass-card p-5">
+        <h4 className="text-sm font-semibold text-gray-200">Monthly Activity &amp; Discipline</h4>
+        <ChartQuestion text='"Am I showing up prepared, and is it improving over time?"' />
+        {monthly.length === 0
+          ? <Empty msg="No trading days logged yet" />
+          : (
+            <ResponsiveContainer width="100%" height={280}>
+              <ComposedChart data={monthly} margin={{ top: 4, right: 44, left: 0, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: AXIS, fontSize: 11 }} axisLine={false} tickLine={false} interval={xInterval} />
+                <YAxis yAxisId="left"  tick={{ fill: AXIS, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fill: C.planRate, fontSize: 11 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} />
+                <Tooltip content={<MonthTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} formatter={(v) => <span style={{ color: '#9ca3af' }}>{v}</span>} />
+                <Bar yAxisId="left" dataKey="totalDays"   name="Total Days"     fill={C.total}   radius={[3,3,0,0]} maxBarSize={28} />
+                <Bar yAxisId="left" dataKey="plannedDays" name="Days with Plan" fill={C.planned} radius={[3,3,0,0]} maxBarSize={28} />
+                <Line yAxisId="right" type="monotone" dataKey="planRate" name="Plan Rate" stroke={C.planRate} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )
+        }
+      </div>
+
+      {/* ── Row 2: Donut + KPIs ── */}
+      <div className="grid grid-cols-5 gap-5">
+
+        {/* Donut with CSS-overlay center label */}
+        <div className="col-span-2 glass-card p-5">
+          <h4 className="text-sm font-semibold text-gray-200">Verdict Outcome Breakdown</h4>
+          <ChartQuestion text='"What is my actual win rate across all logged days?"' />
+          {donutSlices.length === 0
+            ? <Empty msg="No verdicts recorded yet" />
+            : (
+              <div className="relative">
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={donutSlices} cx="50%" cy="45%" innerRadius={62} outerRadius={88} paddingAngle={3} dataKey="value" startAngle={90} endAngle={-270}>
+                      {donutSlices.map((s, i) => <Cell key={i} fill={s.color} stroke="transparent" />)}
+                    </Pie>
+                    <Tooltip content={<DonutTooltip />} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: '#9ca3af' }}>{v}</span>} />
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* Center label overlay */}
+                <div className="absolute top-0 left-0 right-0 flex justify-center" style={{ top: '20%', pointerEvents: 'none' }}>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-100">{totalDays}</div>
+                    <div className="text-xs text-gray-500">days</div>
+                  </div>
+                </div>
+              </div>
+            )
+          }
+        </div>
+
+        {/* KPI cards */}
+        <div className="col-span-3 grid grid-rows-3 gap-4">
+          <KPICard
+            label="Total Days Logged"
+            value={totalDays}
+            sub="trading days recorded in the journal"
+          />
+          <KPICard
+            label="Preparation Rate"
+            value={`${prepRate}%`}
+            sub="of reviewed days had a prepared plan"
+            color={prepRate >= 70 ? 'text-emerald-400' : prepRate >= 40 ? 'text-amber-400' : 'text-red-400'}
+          />
+          <KPICard
+            label="Plan Success Rate"
+            value={`${successRate}%`}
+            sub="of planned days the market accepted the scenario"
+            color={successRate >= 60 ? 'text-emerald-400' : successRate >= 40 ? 'text-amber-400' : 'text-red-400'}
+          />
+        </div>
+
+      </div>
+    </div>
+  );
+}

@@ -5,22 +5,21 @@ import { TIMEFRAMES } from '../../../shared/constants';
 
 export default function StockPlanForm({ onCreated, onCancel }) {
   const { createPlan, importChart } = useStockPlan();
-  const { showNotification } = useApp();
+  const { showNotification, symbols } = useApp();
 
-  const [stockName, setStockName] = useState('');
+  const [symbolId, setSymbolId] = useState('');
   const [timeframe, setTimeframe] = useState('Weekly');
   const [analysis, setAnalysis] = useState('');
   const [entryPrice, setEntryPrice] = useState('');
   const [targetPrice, setTargetPrice] = useState('');
   const [stopLoss, setStopLoss] = useState('');
-  const [chartFile, setChartFile] = useState(null); // temporary source path
+  const [chartFile, setChartFile] = useState(null);
   const [chartSrc, setChartSrc] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
 
   useEffect(() => {
-    window.api.stockPlan.getDistinctStockNames().then(setSuggestions);
-  }, []);
+    if (symbols.length > 0 && !symbolId) setSymbolId(String(symbols[0].id));
+  }, [symbols]);
 
   const handleChartUpload = async () => {
     const filePaths = await window.api.dialog.openFile();
@@ -35,21 +34,22 @@ export default function StockPlanForm({ onCreated, onCancel }) {
   };
 
   const handleSubmit = async () => {
-    if (!stockName.trim()) {
-      showNotification('Stock name is required', 'error');
+    const selectedSymbol = symbols.find((s) => s.id === Number(symbolId));
+    if (!selectedSymbol) {
+      showNotification('Please select a symbol', 'error');
       return;
     }
     setSaving(true);
     try {
-      // Import chart now with correct stock name
       let chartPath = null;
       if (chartFile) {
         const fileName = `${Date.now()}_${chartFile.split(/[/\\]/).pop()}`;
-        chartPath = await importChart(chartFile, stockName.trim().toUpperCase(), fileName);
+        chartPath = await importChart(chartFile, selectedSymbol.name, fileName);
       }
 
       const plan = await createPlan({
-        stockName: stockName.trim().toUpperCase(),
+        symbolId: selectedSymbol.id,
+        stockName: selectedSymbol.name,
         timeframe,
         analysis: analysis.trim(),
         entryPrice: entryPrice ? parseFloat(entryPrice) : null,
@@ -68,10 +68,6 @@ export default function StockPlanForm({ onCreated, onCancel }) {
     }
   };
 
-  const filteredSuggestions = stockName.length > 0
-    ? suggestions.filter((s) => s.toUpperCase().includes(stockName.toUpperCase()) && s.toUpperCase() !== stockName.toUpperCase())
-    : [];
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -88,29 +84,18 @@ export default function StockPlanForm({ onCreated, onCancel }) {
         <h3 className="text-base font-semibold text-gray-200">New Stock Swing Plan</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Stock Name with suggestions */}
-          <div className="relative">
+          {/* Stock Name */}
+          <div>
             <label className="block text-[10px] text-gray-500 mb-1 uppercase">Stock Name</label>
-            <input
-              type="text"
-              value={stockName}
-              onChange={(e) => setStockName(e.target.value)}
-              placeholder="e.g. RELIANCE, TCS"
+            <select
+              value={symbolId}
+              onChange={(e) => setSymbolId(e.target.value)}
               className="input-field text-sm"
-            />
-            {filteredSuggestions.length > 0 && (
-              <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-surface-700 border border-surface-500 rounded-lg shadow-lg max-h-32 overflow-y-auto">
-                {filteredSuggestions.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setStockName(s)}
-                    className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-surface-600 transition-colors"
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
+            >
+              {symbols.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Timeframe */}

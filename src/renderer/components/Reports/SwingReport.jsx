@@ -1,0 +1,241 @@
+import React, { useState, useEffect } from 'react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer, LabelList,
+  PieChart, Pie, Cell,
+} from 'recharts';
+
+// ── Theme constants ───────────────────────────────────────────────────────────
+const GRID = '#1f2937';
+const AXIS = '#6b7280';
+const TT   = { backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '8px', padding: '8px 12px' };
+
+const C = {
+  pass:      '#10b981',
+  fail:      '#ef4444',
+  partial:   '#f59e0b',
+  cancelled: '#6b7280',
+  waiting:   '#6366f1',
+};
+
+const STATUS_ORDER = ['Pass', 'Fail', 'Partial', 'Cancelled', 'Waiting'];
+const TF_ORDER     = ['Monthly', 'Weekly', 'Daily', '4Hrs', '1Hrs'];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function pct(num, den) {
+  if (!den) return 0;
+  return Math.round(((num || 0) / den) * 100);
+}
+
+// ── Shared small components ───────────────────────────────────────────────────
+function ChartQuestion({ text }) {
+  return (
+    <div className="flex items-start gap-2 mt-1 mb-4">
+      <div className="w-0.5 self-stretch bg-primary-500/50 rounded-full flex-shrink-0 min-h-[1.2rem]" />
+      <p className="text-xs text-primary-300/75 italic leading-relaxed">{text}</p>
+    </div>
+  );
+}
+
+function KPICard({ label, value, sub, color = 'text-gray-100' }) {
+  return (
+    <div className="glass-card p-4 space-y-1">
+      <span className="block text-xs text-gray-500 uppercase tracking-wider">{label}</span>
+      <span className={`block text-2xl font-bold ${color}`}>{value}</span>
+      {sub && <span className="block text-xs text-gray-600 leading-relaxed">{sub}</span>}
+    </div>
+  );
+}
+
+function Empty({ msg }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 text-gray-600 gap-2">
+      <svg className="w-8 h-8 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+      </svg>
+      <span className="text-sm">{msg}</span>
+    </div>
+  );
+}
+
+// ── Custom tooltips ───────────────────────────────────────────────────────────
+function StatusTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={TT} className="text-xs">
+      <span className="text-gray-400">{payload[0].name}: </span>
+      <span className="text-gray-200 font-semibold">{payload[0].value} plans</span>
+    </div>
+  );
+}
+
+function TFTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  const closed = payload
+    .filter((p) => ['Pass','Fail','Partial'].includes(p.name))
+    .reduce((s, p) => s + (p.value || 0), 0);
+  const passVal = payload.find((p) => p.name === 'Pass')?.value || 0;
+  return (
+    <div style={TT} className="text-xs space-y-1 min-w-[130px]">
+      <p className="font-semibold text-gray-200 mb-1.5">{label}</p>
+      {payload.map((p) => p.value > 0 && (
+        <div key={p.name} className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.fill }} />
+          <span className="text-gray-400">{p.name}:</span>
+          <span className="text-gray-200 font-medium ml-auto pl-2">{p.value}</span>
+        </div>
+      ))}
+      {closed > 0 && (
+        <div className="border-t border-gray-700 pt-1 mt-1 flex justify-between">
+          <span className="text-gray-500">Win Rate:</span>
+          <span className="text-emerald-400 font-semibold">{pct(passVal, closed)}%</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Win-rate label at end of each horizontal bar row
+function WinRateLabel({ x, y, width, height, value }) {
+  if (!value) return null;
+  return (
+    <text x={x + width + 6} y={y + height / 2 + 4} fill="#9ca3af" fontSize={10}>
+      {value}%
+    </text>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+export default function SwingReport() {
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
+
+  useEffect(() => {
+    window.api.report.swing()
+      .then((d) => { setData(d); setLoading(false); })
+      .catch((e) => { setError(e.message || 'Failed to load report'); setLoading(false); });
+  }, []);
+
+  // ── Derived data ──
+  const statusMap = {};
+  (data?.statusBreakdown || []).forEach((r) => { statusMap[r.status] = r.count; });
+
+  const donutSlices = STATUS_ORDER
+    .map((s) => ({ name: s, value: statusMap[s] || 0, color: C[s.toLowerCase()] }))
+    .filter((s) => s.value > 0);
+
+  const totalPlans = donutSlices.reduce((s, d) => s + d.value, 0);
+
+  const tfMap = {};
+  (data?.byTimeframe || []).forEach((r) => { tfMap[r.timeframe] = r; });
+
+  const tfData = TF_ORDER.filter((tf) => tfMap[tf]).map((tf) => {
+    const r = tfMap[tf];
+    const closed = (r.pass || 0) + (r.fail || 0) + (r.partial || 0);
+    return {
+      timeframe: tf,
+      Pass:      r.pass      || 0,
+      Partial:   r.partial   || 0,
+      Fail:      r.fail      || 0,
+      Cancelled: r.cancelled || 0,
+      Waiting:   r.waiting   || 0,
+      winRate:   pct(r.pass || 0, closed),
+    };
+  });
+
+  const t = data?.totals || {};
+  const closedTotal = (t.pass || 0) + (t.fail || 0) + (t.partial || 0);
+  const overallWin  = pct(t.pass || 0, closedTotal);
+
+  if (loading) return <div className="flex items-center justify-center py-32 text-gray-500 text-sm">Loading report…</div>;
+  if (error)   return <div className="flex items-center justify-center py-32 text-red-400 text-sm">{error}</div>;
+
+  return (
+    <div className="space-y-6">
+
+      {/* ── Row 1: Donut + KPIs ── */}
+      <div className="grid grid-cols-5 gap-5">
+
+        {/* Donut with CSS-overlay center label */}
+        <div className="col-span-2 glass-card p-5">
+          <h4 className="text-sm font-semibold text-gray-200">Execution Status Overview</h4>
+          <ChartQuestion text='"How are my swing trades resolving overall?"' />
+          {donutSlices.length === 0
+            ? <Empty msg="No swing plans yet" />
+            : (
+              <div className="relative">
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={donutSlices} cx="50%" cy="45%" innerRadius={62} outerRadius={88} paddingAngle={3} dataKey="value" startAngle={90} endAngle={-270}>
+                      {donutSlices.map((s, i) => <Cell key={i} fill={s.color} stroke="transparent" />)}
+                    </Pie>
+                    <Tooltip content={<StatusTooltip />} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: '#9ca3af' }}>{v}</span>} />
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* Center label overlay */}
+                <div className="absolute top-0 left-0 right-0 flex justify-center" style={{ top: '20%', pointerEvents: 'none' }}>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-100">{totalPlans}</div>
+                    <div className="text-xs text-gray-500">plans</div>
+                  </div>
+                </div>
+              </div>
+            )
+          }
+        </div>
+
+        {/* KPI cards */}
+        <div className="col-span-3 grid grid-rows-3 gap-4">
+          <KPICard
+            label="Total Swing Plans"
+            value={t.total || 0}
+            sub="plans created across all timeframes"
+          />
+          <KPICard
+            label="Overall Win Rate"
+            value={`${overallWin}%`}
+            sub="Pass ÷ (Pass + Fail + Partial)"
+            color={overallWin >= 60 ? 'text-emerald-400' : overallWin >= 40 ? 'text-amber-400' : 'text-red-400'}
+          />
+          <KPICard
+            label="Still Open"
+            value={statusMap['Waiting'] || 0}
+            sub="plans currently in Waiting status"
+            color="text-primary-400"
+          />
+        </div>
+      </div>
+
+      {/* ── Chart 2: Timeframe Performance ── */}
+      <div className="glass-card p-5">
+        <h4 className="text-sm font-semibold text-gray-200">Performance by Timeframe</h4>
+        <ChartQuestion text='"Which timeframe do I execute best in?"' />
+        {tfData.length === 0
+          ? <Empty msg="No timeframe data yet" />
+          : (
+            <ResponsiveContainer width="100%" height={Math.max(200, tfData.length * 68)}>
+              <BarChart data={tfData} layout="vertical" margin={{ top: 4, right: 64, left: 8, bottom: 4 }} barCategoryGap="30%">
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
+                <XAxis type="number" tick={{ fill: AXIS, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <YAxis type="category" dataKey="timeframe" tick={{ fill: '#d1d5db', fontSize: 12 }} axisLine={false} tickLine={false} width={56} />
+                <Tooltip content={<TFTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} formatter={(v) => <span style={{ color: '#9ca3af' }}>{v}</span>} />
+                <Bar dataKey="Pass"      stackId="s" fill={C.pass}      maxBarSize={22} radius={0} />
+                <Bar dataKey="Partial"   stackId="s" fill={C.partial}   maxBarSize={22} radius={0} />
+                <Bar dataKey="Fail"      stackId="s" fill={C.fail}      maxBarSize={22} radius={0} />
+                <Bar dataKey="Cancelled" stackId="s" fill={C.cancelled} maxBarSize={22} radius={0} />
+                <Bar dataKey="Waiting"   stackId="s" fill={C.waiting}   maxBarSize={22} radius={[0,4,4,0]}>
+                  <LabelList dataKey="winRate" content={WinRateLabel} position="right" />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )
+        }
+      </div>
+
+    </div>
+  );
+}

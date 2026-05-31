@@ -13,11 +13,12 @@ module.exports = {
     ).get(id);
   },
 
-  create({ stockName, timeframe, analysis, entryPrice, targetPrice, stopLoss, chartPath }) {
+  create({ symbolId, stockName, timeframe, analysis, entryPrice, targetPrice, stopLoss, chartPath }) {
     const result = getDb().prepare(
-      `INSERT INTO stock_plan (stock_name, timeframe, analysis, entry_price, target_price, stop_loss, chart_path)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO stock_plan (symbol_id, stock_name, timeframe, analysis, entry_price, target_price, stop_loss, chart_path)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
+      symbolId ?? null,
       stockName,
       timeframe,
       analysis || null,
@@ -29,14 +30,15 @@ module.exports = {
     return this.getById(result.lastInsertRowid);
   },
 
-  update(id, { stockName, timeframe, analysis, entryPrice, targetPrice, stopLoss, chartPath }) {
+  update(id, { symbolId, stockName, timeframe, analysis, entryPrice, targetPrice, stopLoss, chartPath }) {
     getDb().prepare(
       `UPDATE stock_plan
-       SET stock_name = ?, timeframe = ?, analysis = ?,
+       SET symbol_id = ?, stock_name = ?, timeframe = ?, analysis = ?,
            entry_price = ?, target_price = ?, stop_loss = ?,
            chart_path = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`
     ).run(
+      symbolId ?? null,
       stockName,
       timeframe,
       analysis || null,
@@ -68,7 +70,7 @@ module.exports = {
     return getDb().prepare('DELETE FROM stock_plan WHERE id = ?').run(id);
   },
 
-  search({ query, executionStatus, timeframe }) {
+  search({ query, executionStatus, timeframe, activeOnly }) {
     let sql = 'SELECT * FROM stock_plan WHERE 1=1';
     const params = [];
 
@@ -77,7 +79,10 @@ module.exports = {
       params.push(`%${query.trim()}%`);
     }
 
-    if (executionStatus) {
+    if (activeOnly) {
+      sql += ' AND (execution_status IS NULL OR execution_status = ?)';
+      params.push('Waiting');
+    } else if (executionStatus) {
       sql += ' AND execution_status = ?';
       params.push(executionStatus);
     }

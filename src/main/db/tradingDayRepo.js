@@ -105,6 +105,38 @@ module.exports = {
     return getDb().prepare('DELETE FROM trading_day WHERE id = ?').run(id);
   },
 
+  updateDate(id, newDate) {
+    const db = getDb();
+    const existing = db.prepare('SELECT symbol_id FROM trading_day WHERE id = ?').get(id);
+    if (!existing) throw new Error('Trading day not found');
+
+    const conflict = db.prepare(
+      'SELECT id FROM trading_day WHERE trade_date = ? AND symbol_id = ? AND id != ?'
+    ).get(newDate, existing.symbol_id, id);
+    if (conflict) throw new Error(`A plan already exists for ${newDate}`);
+
+    db.prepare(
+      'UPDATE trading_day SET trade_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).run(newDate, id);
+    return this.getById(id);
+  },
+
+  getForExport({ symbolIds, dateFrom, dateTo }) {
+    const db = getDb();
+    const placeholders = symbolIds.map(() => '?').join(',');
+    let sql = `
+      SELECT td.id, td.trade_date, td.symbol_id, td.notes, s.name as symbol_name
+      FROM trading_day td
+      JOIN symbol s ON td.symbol_id = s.id
+      WHERE td.symbol_id IN (${placeholders})
+    `;
+    const params = [...symbolIds];
+    if (dateFrom) { sql += ' AND td.trade_date >= ?'; params.push(dateFrom); }
+    if (dateTo)   { sql += ' AND td.trade_date <= ?'; params.push(dateTo); }
+    sql += ' ORDER BY s.name, td.trade_date';
+    return db.prepare(sql).all(...params);
+  },
+
   getAvailableDates(symbolId) {
     const rows = getDb().prepare(
       'SELECT DISTINCT trade_date FROM trading_day WHERE symbol_id = ? ORDER BY trade_date DESC'

@@ -176,6 +176,16 @@
   color: #334155 !important;
 }
 
+/* Ensure calendar portal and popper sit above all other elements */
+#datepicker-portal {
+  position: relative;
+  z-index: 9999;
+}
+
+.dark-datepicker-popper {
+  z-index: 9999 !important;
+}
+
 /* Arrow styling */
 .react-datepicker-popper .react-datepicker__triangle::before,
 .react-datepicker-popper .react-datepicker__triangle::after {

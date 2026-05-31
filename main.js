@@ -16,6 +16,8 @@ const customPlanScreenshotRepo = require('./src/main/db/customPlanScreenshotRepo
 const intradayNoteRepo = require('./src/main/db/intradayNoteRepo');
 const intradayNoteScreenshotRepo = require('./src/main/db/intradayNoteScreenshotRepo');
 const planningService = require('./src/main/services/PlanningService');
+const exportService = require('./src/main/services/ExportService');
+const backupService = require('./src/main/services/BackupService');
 
 let mainWindow;
 const imageViewerWindows = new Set();
@@ -112,6 +114,7 @@ function registerIpcHandlers() {
     tradingDayRepo.updateNotes(id, notes)
   );
 
+  ipcMain.handle('tradingDay:updateDate', (_, id, newDate) => tradingDayRepo.updateDate(id, newDate));
   ipcMain.handle('tradingDay:delete', (_, id) => tradingDayRepo.delete(id));
   ipcMain.handle('tradingDay:getAvailableDates', (_, symbolId) => tradingDayRepo.getAvailableDates(symbolId));
 
@@ -321,4 +324,196 @@ function registerIpcHandlers() {
   ipcMain.handle('intradayNoteScreenshot:delete', (_, id) =>
     intradayNoteScreenshotRepo.delete(id)
   );
+
+  // --- Export handlers ---
+  ipcMain.handle('export:toCSV', async (_, params) => {
+    try {
+      const exportData = exportService.buildExportData({ ...params, forPdf: false });
+      if (exportData.summary.totalDays === 0) {
+        return { success: false, error: 'No data found for the selected scope.' };
+      }
+      const defaultName = `TPB_${(params.symbolNames || []).join('-')}_${Date.now()}.csv`;
+      const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Save CSV Export',
+        defaultPath: defaultName,
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+      });
+      if (canceled || !filePath) return { success: false, canceled: true };
+      exportService.exportToCSV(exportData, filePath);
+      return { success: true, filePath };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('export:toPDF', async (_, params) => {
+    try {
+      const exportData = exportService.buildExportData({ ...params, forPdf: true });
+      if (exportData.summary.totalDays === 0) {
+        return { success: false, error: 'No data found for the selected scope.' };
+      }
+      const defaultName = `TPB_${(params.symbolNames || []).join('-')}_${Date.now()}.pdf`;
+      const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Save PDF Export',
+        defaultPath: defaultName,
+        filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
+      });
+      if (canceled || !filePath) return { success: false, canceled: true };
+      await exportService.exportToPDF(exportData, filePath);
+      return { success: true, filePath };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('export:swingToCSV', async (_, params) => {
+    try {
+      const swingData = exportService.buildSwingExportData({ ...params, forPdf: false });
+      if (swingData.summary.total === 0) {
+        return { success: false, error: 'No swing plans found for the selected scope.' };
+      }
+      const defaultName = `TPB_Swing_${Date.now()}.csv`;
+      const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Save Swing Plans CSV',
+        defaultPath: defaultName,
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+      });
+      if (canceled || !filePath) return { success: false, canceled: true };
+      exportService.exportSwingToCSV(swingData, filePath);
+      return { success: true, filePath };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('export:swingToPDF', async (_, params) => {
+    try {
+      const swingData = exportService.buildSwingExportData({ ...params, forPdf: true });
+      if (swingData.summary.total === 0) {
+        return { success: false, error: 'No swing plans found for the selected scope.' };
+      }
+      const defaultName = `TPB_Swing_${Date.now()}.pdf`;
+      const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Save Swing Plans PDF',
+        defaultPath: defaultName,
+        filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
+      });
+      if (canceled || !filePath) return { success: false, canceled: true };
+      await exportService.exportSwingToPDF(swingData, filePath);
+      return { success: true, filePath };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // --- Backup / Restore handlers ---
+  ipcMain.handle('backup:export', async () => {
+    try {
+      const db = getDb();
+      const userData = app.getPath('userData');
+      const backupData = backupService.exportBackup(db, userData);
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const defaultName = `TPB_Backup_${stamp}.tpbj`;
+      const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Save Backup',
+        defaultPath: defaultName,
+        filters: [{ name: 'Trading PlayBook Backup', extensions: ['tpbj'] }],
+      });
+      if (canceled || !filePath) return { success: false, canceled: true };
+      fs.writeFileSync(filePath, JSON.stringify(backupData), 'utf8');
+      return { success: true, filePath };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('backup:import', async () => {
+    try {
+      const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
+        title: 'Select Backup File',
+        filters: [{ name: 'Trading PlayBook Backup', extensions: ['tpbj'] }],
+        properties: ['openFile'],
+      });
+      if (canceled || !filePaths.length) return { success: false, canceled: true };
+      const db = getDb();
+      const userData = app.getPath('userData');
+      const stats = backupService.importBackup(db, userData, filePaths[0]);
+      return { success: true, stats };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // --- Report handlers ---
+  ipcMain.handle('report:intraday', (_, symbolId) => {
+    const db = getDb();
+    const where = symbolId ? 'WHERE td.symbol_id = ?' : '';
+    const args  = symbolId ? [symbolId] : [];
+
+    const monthly = db.prepare(`
+      SELECT
+        strftime('%Y-%m', td.trade_date)                                             AS month,
+        COUNT(DISTINCT td.id)                                                        AS totalDays,
+        COUNT(DISTINCT v.id)                                                         AS verdictDays,
+        SUM(CASE WHEN v.had_plan = 1 THEN 1 ELSE 0 END)                             AS plannedDays,
+        SUM(CASE WHEN v.had_plan = 1 AND v.outcome = 'Accepted' THEN 1 ELSE 0 END)  AS acceptedDays
+      FROM trading_day td
+      LEFT JOIN verdict v ON v.trading_day_id = td.id
+      ${where}
+      GROUP BY month
+      ORDER BY month
+    `).all(...args);
+
+    const breakdown = db.prepare(`
+      SELECT
+        COUNT(DISTINCT td.id)                                                                  AS totalDays,
+        COUNT(DISTINCT v.id)                                                                   AS verdictDays,
+        SUM(CASE WHEN v.id IS NULL THEN 1 ELSE 0 END)                                         AS noVerdict,
+        SUM(CASE WHEN v.id IS NOT NULL AND v.had_plan = 0 THEN 1 ELSE 0 END)                  AS noPlan,
+        SUM(CASE WHEN v.had_plan = 1 AND v.outcome = 'Accepted' THEN 1 ELSE 0 END)            AS accepted,
+        SUM(CASE WHEN v.had_plan = 1 AND v.outcome = 'Rejected' THEN 1 ELSE 0 END)            AS rejected
+      FROM trading_day td
+      LEFT JOIN verdict v ON v.trading_day_id = td.id
+      ${where}
+    `).get(...args);
+
+    return { monthly, breakdown };
+  });
+
+  ipcMain.handle('report:swing', () => {
+    const db = getDb();
+
+    const statusBreakdown = db.prepare(`
+      SELECT COALESCE(execution_status, 'Waiting') AS status, COUNT(*) AS count
+      FROM stock_plan
+      GROUP BY status
+    `).all();
+
+    const byTimeframe = db.prepare(`
+      SELECT
+        timeframe,
+        SUM(CASE WHEN execution_status = 'Pass'      THEN 1 ELSE 0 END) AS pass,
+        SUM(CASE WHEN execution_status = 'Fail'      THEN 1 ELSE 0 END) AS fail,
+        SUM(CASE WHEN execution_status = 'Partial'   THEN 1 ELSE 0 END) AS partial,
+        SUM(CASE WHEN execution_status = 'Cancelled' THEN 1 ELSE 0 END) AS cancelled,
+        SUM(CASE WHEN execution_status = 'Waiting' OR execution_status IS NULL THEN 1 ELSE 0 END) AS waiting,
+        COUNT(*) AS total
+      FROM stock_plan
+      GROUP BY timeframe
+      ORDER BY CASE timeframe
+        WHEN 'Monthly' THEN 1 WHEN 'Weekly' THEN 2 WHEN 'Daily' THEN 3
+        WHEN '4Hrs' THEN 4 WHEN '1Hrs' THEN 5 ELSE 6 END
+    `).all();
+
+    const totals = db.prepare(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN execution_status = 'Pass'    THEN 1 ELSE 0 END) AS pass,
+        SUM(CASE WHEN execution_status = 'Fail'    THEN 1 ELSE 0 END) AS fail,
+        SUM(CASE WHEN execution_status = 'Partial' THEN 1 ELSE 0 END) AS partial
+      FROM stock_plan
+    `).get();
+
+    return { statusBreakdown, byTimeframe, totals };
+  });
 }

@@ -1,0 +1,94 @@
+# Trading Play Book
+
+A purpose-built desktop journal for traders who follow a disciplined, process-driven approach.  
+Bridges pre-market planning with post-market review — building consistency and self-awareness in every trading decision.
+
+> **Donationware** — free to download and use forever.  
+> If it adds value to your trading journey, a small donation keeps this project alive. 🙏
+
+---
+
+## System Requirements
+
+| Requirement | Details |
+|-------------|---------|
+| **OS** | Windows 10 or Windows 11 (64-bit) |
+| **Disk space** | ~300 MB for the application |
+| **Extra space** | Additional space for your screenshots (depends on usage) |
+| **Internet** | Not required — works fully offline |
+| **Node.js / Python / Java** | Not required — everything is bundled |
+
+> No additional software or runtimes need to be installed.  
+> The app bundles its own runtime (Electron + Chromium + SQLite).
+
+---
+
+## Download
+
+Go to the [**Releases**](../../releases/latest) page and download one of:
+
+| File | When to use |
+|------|-------------|
+| `Trading Play Book Setup 1.0.0.exe` | **Recommended** — installs the app, creates Start Menu & Desktop shortcuts |
+| `Trading Play Book 1.0.0.exe` | **Portable** — run directly without installing, no admin rights needed |
+
+---
+
+## Installation
+
+### Installer (recommended)
+1. Download `Trading Play Book Setup 1.0.0.exe`
+2. Run the installer — Windows may show a SmartScreen warning (see note below)
+3. Choose your install folder (default: `C:\Program Files\Trading Play Book`)
+4. Launch from the Desktop shortcut or Start Menu
+
+### Portable
+1. Download `Trading Play Book 1.0.0.exe`
+2. Place it in any folder you prefer
+3. Double-click to run — no installation needed
+
+> **Windows SmartScreen warning?**  
+> Since this app is not code-signed, Windows may show "Windows protected your PC".  
+> Click **More info → Run anyway** to proceed. The app is safe.
+
+---
+
+## Where is my data stored?
+
+All your trading data (plans, verdicts, notes) is stored locally in a SQLite database at:
+
+```
+C:\Users\<YourName>\AppData\Roaming\Trading Play Book\trading-journal.db
+```
+
+Screenshots you attach are stored at their **original location** on your drive — the app only saves the file path.
+
+> **Backup tip:** Copy the `trading-journal.db` file to keep a backup of all your data.
+
+---
+
+## Features — v1.0
+
+- **Default Basic Plans** — 6 Plan Profile opening scenarios with target, stop-out, and screenshots per outcome
+- **Custom Plans** — Create your own trade plans with bias tags, price levels, and per-plan verdicts
+- **Post-Market Verdict** — Record what actually happened and review plan effectiveness
+- **Plan Analysis** — Behaviour tag mapping across all plans with date navigation
+- **Gallery & Metrics** — Filterable history, performance dashboard, and screenshot viewer
+- **Stock Swing Plans** — Standalone module for stock-level trade planning with execution tracking
+
+---
+
+## Support the Project
+
+If you find Trading Play Book useful, consider supporting its development:
+
+- Scan the donation QR code inside the app (Help → About)
+- Every contribution is deeply appreciated
+
+---
+
+## Author
+
+**Kaeswar** — [kaeswar@gmail.com](mailto:kaeswar@gmail.com)
+
+Built with Electron · React · Vite · Tailwind CSS · SQLite

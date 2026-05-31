@@ -30,6 +30,7 @@ export default function StyledDatePicker({ value, onChange, highlightDates = [],
         calendarClassName="dark-datepicker"
         popperClassName="dark-datepicker-popper"
         showPopperArrow={false}
+        portalId="datepicker-portal"
       />
     </div>
   );

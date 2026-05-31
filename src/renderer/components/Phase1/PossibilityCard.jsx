@@ -224,6 +224,7 @@ const PossibilityCard = forwardRef(function PossibilityCard({ possibility, spec,
                     bias={possibility.bias}
                     existingPlan={existingPlan}
                     possibilityId={possibility.id}
+                    possibilityCode={possibility.code}
                     tradingDay={tradingDay}
                     onRefresh={onRefresh}
                   />

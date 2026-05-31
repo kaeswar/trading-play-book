@@ -3,9 +3,9 @@ import { useStockPlan } from '../../hooks/useStockPlan';
 import { useApp } from '../../store/appStore';
 import { EXECUTION_STATUSES, EXECUTION_STATUS_COLORS, TIMEFRAMES, TIMEFRAME_COLORS, formatDate } from '../../../shared/constants';
 
-export default function StockPlanDetail({ planId, onBack }) {
+export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
   const { updatePlan, deletePlan, updateStatus, importChart } = useStockPlan();
-  const { showNotification } = useApp();
+  const { showNotification, symbols } = useApp();
 
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -13,6 +13,7 @@ export default function StockPlanDetail({ planId, onBack }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Editable fields
+  const [symbolId, setSymbolId] = useState('');
   const [stockName, setStockName] = useState('');
   const [timeframe, setTimeframe] = useState('Weekly');
   const [analysis, setAnalysis] = useState('');
@@ -32,6 +33,7 @@ export default function StockPlanDetail({ planId, onBack }) {
       const data = await window.api.stockPlan.getById(planId);
       if (data) {
         setPlan(data);
+        setSymbolId(data.symbol_id ? String(data.symbol_id) : '');
         setStockName(data.stock_name || '');
         setTimeframe(data.timeframe || 'Weekly');
         setAnalysis(data.analysis || '');
@@ -55,14 +57,16 @@ export default function StockPlanDetail({ planId, onBack }) {
   };
 
   const handleSave = async () => {
-    if (!stockName.trim()) {
-      showNotification('Stock name is required', 'error');
+    const selectedSymbol = symbols.find((s) => s.id === Number(symbolId));
+    if (!selectedSymbol) {
+      showNotification('Please select a symbol', 'error');
       return;
     }
     setSaving(true);
     try {
       const updated = await updatePlan(planId, {
-        stockName: stockName.trim(),
+        symbolId: selectedSymbol.id,
+        stockName: selectedSymbol.name,
         timeframe,
         analysis: analysis.trim(),
         entryPrice: entryPrice ? parseFloat(entryPrice) : null,
@@ -102,7 +106,8 @@ export default function StockPlanDetail({ planId, onBack }) {
 
     const filePath = filePaths[0];
     const fileName = `${Date.now()}_${filePath.split(/[/\\]/).pop()}`;
-    const relativePath = await importChart(filePath, (stockName || plan.stock_name || 'unnamed').toUpperCase(), fileName);
+    const symName = symbols.find((s) => s.id === Number(symbolId))?.name || plan.stock_name || 'unnamed';
+    const relativePath = await importChart(filePath, symName.toUpperCase(), fileName);
     if (relativePath) {
       setChartPath(relativePath);
       const fullPath = await window.api.image.getFullPath(relativePath);
@@ -150,34 +155,38 @@ export default function StockPlanDetail({ planId, onBack }) {
           </svg>
           <span className="text-sm">Back</span>
         </button>
-        <div className="flex items-center gap-2">
-          {confirmDelete ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400">Delete this plan?</span>
-              <button onClick={handleDelete} className="btn-primary text-xs px-3 py-1.5 bg-red-600 hover:bg-red-500">Delete Forever</button>
-              <button onClick={() => setConfirmDelete(false)} className="btn-ghost text-xs px-3 py-1.5">Cancel</button>
-            </div>
-          ) : (
-            <button onClick={() => setConfirmDelete(true)} className="btn-ghost text-xs text-red-400 hover:text-red-300">
-              <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Delete
-            </button>
-          )}
-        </div>
+        {!readOnly && (
+          <div className="flex items-center gap-2">
+            {confirmDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-400">Delete this plan?</span>
+                <button onClick={handleDelete} className="btn-primary text-xs px-3 py-1.5 bg-red-600 hover:bg-red-500">Delete Forever</button>
+                <button onClick={() => setConfirmDelete(false)} className="btn-ghost text-xs px-3 py-1.5">Cancel</button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmDelete(true)} className="btn-ghost text-xs text-red-400 hover:text-red-300">
+                <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Chart section */}
       <div className="glass-card p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium text-gray-300">Chart Snapshot</h3>
-          <button onClick={handleChartUpload} className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            {chartPath ? 'Replace' : 'Upload'}
-          </button>
+          {!readOnly && (
+            <button onClick={handleChartUpload} className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              {chartPath ? 'Replace' : 'Upload'}
+            </button>
+          )}
         </div>
         {chartSrc ? (
           <button onClick={handleChartClick} className="w-full rounded-lg overflow-hidden border border-surface-500/60 hover:border-primary-400/60 transition-colors">
@@ -206,13 +215,16 @@ export default function StockPlanDetail({ planId, onBack }) {
           {/* Stock Name */}
           <div>
             <label className="block text-[10px] text-gray-500 mb-1 uppercase">Stock Name</label>
-            <input
-              type="text"
-              value={stockName}
-              onChange={(e) => setStockName(e.target.value)}
-              placeholder="e.g. RELIANCE, TCS"
-              className="input-field text-sm"
-            />
+            <select
+              value={symbolId}
+              onChange={(e) => setSymbolId(e.target.value)}
+              disabled={readOnly}
+              className={`input-field text-sm ${readOnly ? 'opacity-60 cursor-default' : ''}`}
+            >
+              {symbols.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Timeframe */}
@@ -221,7 +233,8 @@ export default function StockPlanDetail({ planId, onBack }) {
             <select
               value={timeframe}
               onChange={(e) => setTimeframe(e.target.value)}
-              className="input-field text-sm"
+              disabled={readOnly}
+              className={`input-field text-sm ${readOnly ? 'opacity-60 cursor-default' : ''}`}
             >
               {TIMEFRAMES.map((tf) => (
                 <option key={tf} value={tf}>{tf}</option>
@@ -238,7 +251,8 @@ export default function StockPlanDetail({ planId, onBack }) {
             onChange={(e) => setAnalysis(e.target.value)}
             placeholder="Describe your trade thesis, setup, and reasoning..."
             rows={4}
-            className="input-field text-sm resize-y"
+            readOnly={readOnly}
+            className={`input-field text-sm resize-y ${readOnly ? 'opacity-60 cursor-default' : ''}`}
           />
         </div>
 
@@ -252,7 +266,8 @@ export default function StockPlanDetail({ planId, onBack }) {
               value={entryPrice}
               onChange={(e) => setEntryPrice(e.target.value)}
               placeholder="Price"
-              className="input-field text-sm"
+              readOnly={readOnly}
+              className={`input-field text-sm ${readOnly ? 'opacity-60 cursor-default' : ''}`}
             />
           </div>
           <div>
@@ -263,7 +278,8 @@ export default function StockPlanDetail({ planId, onBack }) {
               value={targetPrice}
               onChange={(e) => setTargetPrice(e.target.value)}
               placeholder="Price"
-              className="input-field text-sm"
+              readOnly={readOnly}
+              className={`input-field text-sm ${readOnly ? 'opacity-60 cursor-default' : ''}`}
             />
           </div>
           <div>
@@ -274,7 +290,8 @@ export default function StockPlanDetail({ planId, onBack }) {
               value={stopLoss}
               onChange={(e) => setStopLoss(e.target.value)}
               placeholder="Price"
-              className="input-field text-sm"
+              readOnly={readOnly}
+              className={`input-field text-sm ${readOnly ? 'opacity-60 cursor-default' : ''}`}
             />
           </div>
         </div>
@@ -290,11 +307,11 @@ export default function StockPlanDetail({ planId, onBack }) {
             return (
               <button
                 key={status}
-                onClick={() => handleStatusChange(status)}
+                onClick={() => !readOnly && handleStatusChange(status)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   isActive
                     ? `${colors.bg} ${colors.text} border ${colors.border}`
-                    : 'bg-surface-700 text-gray-400 border border-surface-600 hover:border-surface-500'
+                    : `bg-surface-700 text-gray-400 border border-surface-600 ${readOnly ? 'cursor-default' : 'hover:border-surface-500'}`
                 }`}
               >
                 {status}
@@ -302,30 +319,29 @@ export default function StockPlanDetail({ planId, onBack }) {
             );
           })}
         </div>
-        {plan.execution_status && (
-          <button
-            onClick={() => handleStatusChange(null)}
-            className="text-xs text-gray-500 hover:text-gray-400 mt-2"
-          >
+        {plan.execution_status && !readOnly && (
+          <button onClick={() => handleStatusChange(null)} className="text-xs text-gray-500 hover:text-gray-400 mt-2">
             Clear status
           </button>
         )}
       </div>
 
-      {/* Save button */}
-      <div className="flex justify-end">
-        <button onClick={handleSave} disabled={saving} className="btn-primary text-sm px-6 py-2">
-          {saving ? (
-            <span className="flex items-center gap-2">
-              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-              Saving...
-            </span>
-          ) : 'Save Plan'}
-        </button>
-      </div>
+      {/* Save button — hidden in readOnly */}
+      {!readOnly && (
+        <div className="flex justify-end">
+          <button onClick={handleSave} disabled={saving} className="btn-primary text-sm px-6 py-2">
+            {saving ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Saving...
+              </span>
+            ) : 'Save Plan'}
+          </button>
+        </div>
+      )}
 
       {/* Meta info */}
       <div className="text-xs text-gray-600 text-right">

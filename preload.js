@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('api', {
     getAll: () => ipcRenderer.invoke('tradingDay:getAll'),
     create: (data) => ipcRenderer.invoke('tradingDay:create', data),
     updateNotes: (id, notes) => ipcRenderer.invoke('tradingDay:updateNotes', id, notes),
+    updateDate: (id, newDate) => ipcRenderer.invoke('tradingDay:updateDate', id, newDate),
     delete: (id) => ipcRenderer.invoke('tradingDay:delete', id),
     getAvailableDates: (symbolId) => ipcRenderer.invoke('tradingDay:getAvailableDates', symbolId),
   },
@@ -131,6 +132,26 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('intradayNoteScreenshot:getByIntradayNote', intradayNoteId),
     create: (data) => ipcRenderer.invoke('intradayNoteScreenshot:create', data),
     delete: (id) => ipcRenderer.invoke('intradayNoteScreenshot:delete', id),
+  },
+
+  // Export
+  export: {
+    toCSV: (params) => ipcRenderer.invoke('export:toCSV', params),
+    toPDF: (params) => ipcRenderer.invoke('export:toPDF', params),
+    swingToCSV: (params) => ipcRenderer.invoke('export:swingToCSV', params),
+    swingToPDF: (params) => ipcRenderer.invoke('export:swingToPDF', params),
+  },
+
+  // Backup / Restore
+  backup: {
+    export: () => ipcRenderer.invoke('backup:export'),
+    import: () => ipcRenderer.invoke('backup:import'),
+  },
+
+  // Reports
+  report: {
+    intraday: (symbolId) => ipcRenderer.invoke('report:intraday', symbolId || null),
+    swing:    ()         => ipcRenderer.invoke('report:swing'),
   },
 
   // Stock Plan
