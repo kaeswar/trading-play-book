@@ -103,6 +103,39 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
     onBack();
   };
 
+  const handlePaste = async (e) => {
+    if (readOnly) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        const arrayBuffer = await file.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        const ext = item.type.split('/')[1] === 'jpeg' ? 'jpg' : item.type.split('/')[1];
+        const fileName = `paste_${Date.now()}.${ext}`;
+        const symName = symbols.find((s) => s.id === Number(symbolId))?.name || plan.stock_name || 'stock';
+        try {
+          const relativePath = await window.api.image.saveBuffer(uint8Array, symName, 'stock-plans', fileName);
+          if (relativePath) {
+            setChartPath(relativePath);
+            const fullPath = await window.api.image.getFullPath(relativePath);
+            if (fullPath) {
+              const dataUrl = await window.api.image.toDataUrl(fullPath);
+              if (dataUrl) setChartSrc(dataUrl);
+            }
+            showNotification('Chart pasted', 'success');
+          }
+        } catch {
+          showNotification('Failed to paste chart', 'error');
+        }
+        return;
+      }
+    }
+  };
+
   const handleChartUpload = async () => {
     const filePaths = await window.api.dialog.openFile();
     if (!filePaths || filePaths.length === 0) return;
@@ -188,17 +221,20 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
       </div>
 
       {/* Chart section */}
-      <div className="glass-card p-4">
+      <div className="glass-card p-4" tabIndex={0} onPaste={handlePaste} style={{ outline: 'none' }}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium text-gray-300">Chart Snapshot</h3>
-          {!readOnly && (
-            <button onClick={handleChartUpload} className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              {chartPath ? 'Replace' : 'Upload'}
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {!readOnly && <span className="text-[10px] text-gray-600">Ctrl+V to paste</span>}
+            {!readOnly && (
+              <button onClick={handleChartUpload} className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                {chartPath ? 'Replace' : 'Upload'}
+              </button>
+            )}
+          </div>
         </div>
         {chartSrc ? (
           <button onClick={handleChartClick} className="w-full rounded-lg overflow-hidden border border-surface-500/60 hover:border-primary-400/60 transition-colors">

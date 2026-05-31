@@ -15,6 +15,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
   const [targetPrice, setTargetPrice] = useState('');
   const [stopLoss, setStopLoss] = useState('');
   const [chartFile, setChartFile] = useState(null);
+  const [chartRelPath, setChartRelPath] = useState(null);
   const [chartSrc, setChartSrc] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -27,11 +28,43 @@ export default function StockPlanForm({ onCreated, onCancel }) {
     if (!filePaths || filePaths.length === 0) return;
 
     const filePath = filePaths[0];
-    // Store the source file path, don't import yet
     setChartFile(filePath);
-    // Show preview via data URL (avoids Electron file:/// security block)
+    setChartRelPath(null);
     const dataUrl = await window.api.image.toDataUrl(filePath);
     if (dataUrl) setChartSrc(dataUrl);
+  };
+
+  const handlePaste = async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        const arrayBuffer = await file.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        const ext = item.type.split('/')[1] === 'jpeg' ? 'jpg' : item.type.split('/')[1];
+        const fileName = `paste_${Date.now()}.${ext}`;
+        const symName = symbols.find((s) => s.id === Number(symbolId))?.name || 'stock';
+        try {
+          const relativePath = await window.api.image.saveBuffer(uint8Array, symName, 'stock-plans', fileName);
+          if (relativePath) {
+            setChartRelPath(relativePath);
+            setChartFile(null);
+            const fullPath = await window.api.image.getFullPath(relativePath);
+            if (fullPath) {
+              const dataUrl = await window.api.image.toDataUrl(fullPath);
+              if (dataUrl) setChartSrc(dataUrl);
+            }
+            showNotification('Chart pasted', 'success');
+          }
+        } catch {
+          showNotification('Failed to paste chart', 'error');
+        }
+        return;
+      }
+    }
   };
 
   const handleSubmit = async () => {
@@ -42,7 +75,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
     }
     setSaving(true);
     try {
-      let chartPath = null;
+      let chartPath = chartRelPath || null;
       if (chartFile) {
         const fileName = `${Date.now()}_${chartFile.split(/[/\\]/).pop()}`;
         chartPath = await importChart(chartFile, selectedSymbol.name, fileName);
@@ -190,8 +223,11 @@ export default function StockPlanForm({ onCreated, onCancel }) {
         </div>
 
         {/* Chart upload */}
-        <div>
-          <label className="block text-[10px] text-gray-500 mb-1 uppercase">Chart Snapshot</label>
+        <div tabIndex={0} onPaste={handlePaste} className="outline-none">
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-[10px] text-gray-500 uppercase">Chart Snapshot</label>
+            <span className="text-[10px] text-gray-600">Ctrl+V to paste</span>
+          </div>
           {chartSrc ? (
             <div className="relative">
               <img src={chartSrc} alt="Chart" className="w-full max-h-48 object-contain rounded-lg border border-surface-500/60" onError={() => setChartSrc(null)} />
@@ -215,7 +251,7 @@ export default function StockPlanForm({ onCreated, onCancel }) {
                 <line x1="18" y1="6" x2="18" y2="22" strokeLinecap="round" />
                 <rect x="16" y="10" width="4" height="6" rx="0.5" fill="currentColor" stroke="none" />
               </svg>
-              <p className="text-xs text-gray-500 group-hover:text-gray-400 transition-colors">Click to upload chart</p>
+              <p className="text-xs text-gray-500 group-hover:text-gray-400 transition-colors">Click to upload or Ctrl+V to paste</p>
             </button>
           )}
         </div>
