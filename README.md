@@ -44,21 +44,21 @@ Go to the [**Releases**](../../releases/latest) page and download one of:
 
 | File | When to use |
 |------|-------------|
-| `Trading Play Book Setup 1.0.0.exe` | **Recommended** — installs the app, creates Start Menu & Desktop shortcuts |
-| `Trading Play Book 1.0.0.exe` | **Portable** — run directly without installing, no admin rights needed |
+| `Trading Play Book Setup 1.1.0.exe` | **Recommended** — installs the app, creates Start Menu & Desktop shortcuts |
+| `Trading Play Book 1.1.0.exe` | **Portable** — run directly without installing, no admin rights needed |
 
 ---
 
 ## Installation
 
 ### Installer (recommended)
-1. Download `Trading Play Book Setup 1.0.0.exe`
+1. Download `Trading Play Book Setup 1.1.0.exe`
 2. Run the installer — Windows may show a SmartScreen warning (see note below)
 3. Choose your install folder (default: `C:\Program Files\Trading Play Book`)
 4. Launch from the Desktop shortcut or Start Menu
 
 ### Portable
-1. Download `Trading Play Book 1.0.0.exe`
+1. Download `Trading Play Book 1.1.0.exe`
 2. Place it in any folder you prefer
 3. Double-click to run — no installation needed
 
@@ -82,7 +82,7 @@ Screenshots you attach are stored at their **original location** on your drive �
 
 ---
 
-## Features — v1.0
+## Features — v1.1
 
 - **Default Basic Plans** — 6 Plan Profile opening scenarios with target, stop-out, and screenshots per outcome
 - **Custom Plans** — Create your own trade plans with bias tags, price levels, and per-plan verdicts
@@ -90,6 +90,26 @@ Screenshots you attach are stored at their **original location** on your drive �
 - **Plan Analysis** — Behaviour tag mapping across all plans with date navigation
 - **Gallery & Metrics** — Filterable history, performance dashboard, and screenshot viewer
 - **Stock Swing Plans** — Standalone module for stock-level trade planning with execution tracking
+  - Plan Date — record when the plan was created
+  - Execution Status (Waiting / Pass / Fail / Partial / Cancelled) set at creation and updated anytime
+  - Single-step plan creation — fill everything in one form and save
+  - Bias tags with colour coding (Super Bullish, Bullish, Range Bound, Bearish, Super Bearish)
+
+---
+
+## Release History
+
+### v1.1.0
+- Swing Plans: added Plan Date field
+- Swing Plans: execution status shown in creation form (Waiting by default)
+- Swing Plans: single-step plan creation flow
+- Swing Plans: Update Plan returns to list automatically
+- Fixed crash for plans with Monthly / 4Hrs / 1Hrs timeframes
+- Updated bias tag colours (Range Bound → grey, Bearish → red, Super Bearish → dark red)
+- Centered on-screen notifications
+
+### v1.0.0
+- Initial public release
 
 ---
 
