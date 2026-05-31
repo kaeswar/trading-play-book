@@ -226,6 +226,14 @@ export default function StockPlanDetail({ planId, onBack, readOnly = false }) {
           <h3 className="text-sm font-medium text-gray-300">Chart Snapshot</h3>
           <div className="flex items-center gap-3">
             {!readOnly && <span className="text-[10px] text-gray-600">Ctrl+V to paste</span>}
+            {!readOnly && chartPath && (
+              <button
+                onClick={() => { setChartPath(null); setChartSrc(null); }}
+                className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
+              >
+                Remove
+              </button>
+            )}
             {!readOnly && (
               <button onClick={handleChartUpload} className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1">
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

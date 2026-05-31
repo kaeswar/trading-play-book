@@ -231,12 +231,20 @@ export default function StockPlanForm({ onCreated, onCancel }) {
           {chartSrc ? (
             <div className="relative">
               <img src={chartSrc} alt="Chart" className="w-full max-h-48 object-contain rounded-lg border border-surface-500/60" onError={() => setChartSrc(null)} />
-              <button
-                onClick={handleChartUpload}
-                className="absolute top-2 right-2 text-xs bg-surface-800/90 text-gray-300 px-2 py-1 rounded hover:bg-surface-700 transition-colors"
-              >
-                Replace
-              </button>
+              <div className="absolute top-2 right-2 flex gap-1">
+                <button
+                  onClick={handleChartUpload}
+                  className="text-xs bg-surface-800/90 text-gray-300 px-2 py-1 rounded hover:bg-surface-700 transition-colors"
+                >
+                  Replace
+                </button>
+                <button
+                  onClick={() => { setChartFile(null); setChartRelPath(null); setChartSrc(null); }}
+                  className="text-xs bg-surface-800/90 text-red-400 px-2 py-1 rounded hover:bg-red-500/20 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
             </div>
           ) : (
             <button
