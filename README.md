@@ -8,6 +8,21 @@ Bridges pre-market planning with post-market review — building consistency and
 
 ---
 
+## Support the Project
+
+If you find Trading Play Book useful, consider supporting its development:
+
+<p align="center">
+  <img src="donate_qr.png" alt="Donate via UPI" width="200"/>
+</p>
+
+<p align="center"><b>Scan to donate via UPI</b></p>
+
+- Every contribution is deeply appreciated
+- UPI donations also accepted inside the app (Help → About)
+
+---
+
 ## System Requirements
 
 | Requirement | Details |
@@ -75,21 +90,6 @@ Screenshots you attach are stored at their **original location** on your drive �
 - **Plan Analysis** — Behaviour tag mapping across all plans with date navigation
 - **Gallery & Metrics** — Filterable history, performance dashboard, and screenshot viewer
 - **Stock Swing Plans** — Standalone module for stock-level trade planning with execution tracking
-
----
-
-## Support the Project
-
-If you find Trading Play Book useful, consider supporting its development:
-
-<p align="center">
-  <img src="donate_qr.png" alt="Donate via UPI" width="200"/>
-</p>
-
-<p align="center"><b>Scan to donate via UPI</b></p>
-
-- Every contribution is deeply appreciated
-- UPI donations also accepted inside the app (Help → About)
 
 ---
 
