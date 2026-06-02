@@ -48,21 +48,21 @@ Go to the [**Releases**](../../releases/latest) page and download one of:
 
 | File | When to use |
 |------|-------------|
-| `Trading Play Book Setup 1.3.0.exe` | **Recommended** — installs the app, creates Start Menu & Desktop shortcuts |
-| `Trading Play Book 1.3.0.exe` | **Portable** — run directly without installing, no admin rights needed |
+| `Trading Play Book Setup 1.4.0.exe` | **Recommended** — installs the app, creates Start Menu & Desktop shortcuts |
+| `Trading Play Book 1.4.0.exe` | **Portable** — run directly without installing, no admin rights needed |
 
 ---
 
 ## Installation
 
 ### Installer (recommended)
-1. Download `Trading Play Book Setup 1.3.0.exe`
+1. Download `Trading Play Book Setup 1.4.0.exe`
 2. Run the installer — Windows may show a SmartScreen warning (see note below)
 3. Choose your install folder (default: `C:\Program Files\Trading Play Book`)
 4. Launch from the Desktop shortcut or Start Menu
 
 ### Portable
-1. Download `Trading Play Book 1.3.0.exe`
+1. Download `Trading Play Book 1.4.0.exe`
 2. Place it in any folder you prefer
 3. Double-click to run — no installation needed
 
@@ -86,22 +86,31 @@ Screenshots you attach are stored at their **original location** on your drive �
 
 ---
 
-## Features — v1.3
+## Features — v1.4
 
-- **Default Basic Plans** — 6 Plan Profile opening scenarios with target, stop-out, and screenshots per outcome
-- **Custom Plans** — Create your own trade plans with bias tags, price levels, and per-plan verdicts
-- **Post-Market Verdict** — Record what actually happened and review plan effectiveness
-- **Plan Analysis** — Behaviour tag mapping across all plans with date navigation
-- **Gallery & Metrics** — Filterable history, performance dashboard, and screenshot viewer
-- **Stock Swing Plans** — Standalone module for stock-level trade planning with execution tracking
-  - Plan Date — record when the plan was created
-  - Execution Status (Waiting / Pass / Fail / Partial / Cancelled) set at creation and updated anytime
-  - Single-step plan creation — fill everything in one form and save
-  - Bias tags with colour coding (Super Bullish, Bullish, Range Bound, Bearish, Super Bearish)
+- **Template Library** — Create reusable plan templates (Market Profile Openings, custom strategies) grouped by category; clone, archive, and manage them in Settings
+- **Pre-Market Planning** — Pick templates for the day, set target/stop, attach a setup chart screenshot; cards collapse by default with Expand All / Shrink All
+- **Post-Market Verdict** — Update execution status and outcome for each plan; attach an outcome chart screenshot; cards also collapse/expand
+- **Intraday Notes** — Time-stamped action notes with status tags and screenshots, linked to each day plan
+- **Swing Plans** — Template-based swing trade planning per stock; setup + outcome screenshots, Gallery overview modal with Prev/Next navigation
+- **Gallery & Metrics** — Filterable plan history, performance dashboard, and screenshot viewer
+- **Plan Wise Export** — Export a selected template's performance across all symbols to CSV
+- **Backup & Restore** — Full `.tpbj` backup including all plans, notes, and images; safe incremental restore
 
 ---
 
 ## Release History
+
+### v1.4.0
+- **Screenshot system overhaul** — one screenshot per plan (setup + outcome) enforced at UI, dialog, and DB levels
+- Renamed "Add" → "Attach"; Replace / Remove controls appear when a screenshot is already attached
+- Ctrl+V confirmation prompt when pasting over an existing screenshot
+- Full-width aspect-video thumbnails replacing the old 48px grid
+- **Expand All / Shrink All** for plan cards in both Pre-Market and Verdict views; collapsed by default
+- Verdict collapsed view shows execution status chip so outcomes are visible without expanding
+- Removed plan description text from day plan cards (available in the Template Library)
+- **Backup v4.0.0** — now covers swing plans and their screenshots; old v3 backup files restore safely
+- Language toggle hidden from sidebar (preserved in code for future use)
 
 ### v1.3.0
 - Tamil language support (தமிழ்) — full bilingual UI across all views
