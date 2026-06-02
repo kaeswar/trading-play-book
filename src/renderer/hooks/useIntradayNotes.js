@@ -4,21 +4,16 @@ export function useIntradayNotes() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const getNotes = useCallback(async ({ outcomePlanId, customPlanId }) => {
+  const getByDayPlan = useCallback(async (dayPlanId) => {
     try {
       setLoading(true);
-      let notes;
-      if (outcomePlanId) {
-        notes = await window.api.intradayNote.getByOutcomePlan(outcomePlanId);
-      } else {
-        notes = await window.api.intradayNote.getByCustomPlan(customPlanId);
-      }
-      const notesWithScreenshots = [];
+      const notes = await window.api.intradayNote.getByDayPlan(dayPlanId);
+      const enriched = [];
       for (const note of notes) {
         const screenshots = await window.api.intradayNoteScreenshot.getByIntradayNote(note.id);
-        notesWithScreenshots.push({ ...note, screenshots });
+        enriched.push({ ...note, screenshots });
       }
-      return notesWithScreenshots;
+      return enriched;
     } catch (err) {
       setError(err.message);
       return [];
@@ -27,30 +22,11 @@ export function useIntradayNotes() {
     }
   }, []);
 
-  const getNotesByDay = useCallback(async (tradingDayId) => {
-    try {
-      setLoading(true);
-      const notes = await window.api.intradayNote.getByTradingDay(tradingDayId);
-      const notesWithScreenshots = [];
-      for (const note of notes) {
-        const screenshots = await window.api.intradayNoteScreenshot.getByIntradayNote(note.id);
-        notesWithScreenshots.push({ ...note, screenshots });
-      }
-      return notesWithScreenshots;
-    } catch (err) {
-      setError(err.message);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const createNote = useCallback(async ({ tradingDayId, outcomePlanId, customPlanId, noteTime, action, status }) => {
+  const createNote = useCallback(async ({ tradingDayId, dayPlanId, noteTime, action, status }) => {
     try {
       return await window.api.intradayNote.create({
-        tradingDayId: tradingDayId || null,
-        outcomePlanId: outcomePlanId || null,
-        customPlanId: customPlanId || null,
+        tradingDayId,
+        dayPlanId,
         noteTime,
         action,
         status,
@@ -64,18 +40,6 @@ export function useIntradayNotes() {
   const updateNote = useCallback(async (id, { noteTime, action, status }) => {
     try {
       return await window.api.intradayNote.update(id, { noteTime, action, status });
-    } catch (err) {
-      setError(err.message);
-      return null;
-    }
-  }, []);
-
-  const updateAttachment = useCallback(async (noteId, outcomePlanId, customPlanId) => {
-    try {
-      return await window.api.intradayNote.updateAttachment(noteId, {
-        outcomePlanId: outcomePlanId || null,
-        customPlanId: customPlanId || null,
-      });
     } catch (err) {
       setError(err.message);
       return null;
@@ -127,11 +91,9 @@ export function useIntradayNotes() {
   return {
     loading,
     error,
-    getNotes,
-    getNotesByDay,
+    getByDayPlan,
     createNote,
     updateNote,
-    updateAttachment,
     deleteNote,
     addScreenshot,
     addScreenshotFromBuffer,

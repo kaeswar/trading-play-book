@@ -1,25 +1,26 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../store/appStore';
 import { useTradingDay } from '../../hooks/useTradingDay';
+import { useDayPlan } from '../../hooks/useDayPlan';
 import { useLanguage } from '../../hooks/useLanguage';
-import { POSSIBILITIES, BIAS_COLORS, formatDate } from '../../../shared/constants';
-import PossibilityCard from './PossibilityCard';
-import CustomPlansSection from './CustomPlansSection';
-import BehaviorView from '../Phase3/BehaviorView';
+import { formatDate } from '../../../shared/constants';
+import DayPlanCard from './DayPlanCard';
+import PlanStorePicker from './PlanStorePicker';
 
 export default function PlanningView() {
-  const { selectedSymbol, selectedDate, showNotification, setSaveDayPlanFn, setSavingDayPlan, refreshDatesFn, showNoPlan, setShowNoPlan } = useApp();
+  const { selectedSymbol, selectedDate, showNotification, setSaveDayPlanFn, setSavingDayPlan, refreshDatesFn } = useApp();
   const { createOrGetTradingDay, getTradingDayDetails, updateNotes } = useTradingDay();
+  const { getByTradingDay, createFromTemplate } = useDayPlan();
   const { t } = useLanguage();
 
   const [tradingDay, setTradingDay] = useState(null);
-  const [notes, setNotes] = useState('');
+  const [dayPlans, setDayPlans]     = useState([]);
+  const [notes, setNotes]           = useState('');
   const [dayLoading, setDayLoading] = useState(false);
   const [notesFocused, setNotesFocused] = useState(false);
-  const [dayExists, setDayExists] = useState(null); // null = checking, true/false = result
-  const possibilityRefs = useRef({});
-  const customPlansRef = useRef(null);
-  const [subView, setSubView] = useState('plan'); // plan | analysis
+  const [dayExists, setDayExists]   = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [allExpanded, setAllExpanded] = useState(false);
 
   const loadDay = useCallback(async (showLoading = false) => {
     if (!selectedSymbol || !selectedDate) return;
@@ -31,8 +32,12 @@ export default function PlanningView() {
         const details = await getTradingDayDetails(existing.id);
         setTradingDay(details);
         setNotes(details?.notes || '');
+        const plans = await getByTradingDay(existing.id);
+        setDayPlans(plans);
       } else {
         setDayExists(false);
+        setTradingDay(null);
+        setDayPlans([]);
       }
     } catch (err) {
       console.error('Failed to load day:', err);
@@ -41,70 +46,72 @@ export default function PlanningView() {
     }
   }, [selectedSymbol, selectedDate]);
 
-  // Check if day exists when date/symbol changes
   useEffect(() => {
     loadDay(true);
   }, [selectedSymbol, selectedDate]);
 
-  const handleCreateDay = async () => {
-    setDayLoading(true);
-    try {
-      const day = await createOrGetTradingDay(selectedDate, selectedSymbol.id);
-      if (day) {
-        const details = await getTradingDayDetails(day.id);
-        setTradingDay(details);
-        setNotes(details?.notes || '');
-        setDayExists(true);
-        // Refresh available dates in the header date picker
-        if (refreshDatesFn) refreshDatesFn();
-      }
-    } catch (err) {
-      console.error('Failed to create day:', err);
-      showNotification('Failed to create day plan', 'error');
-    } finally {
-      setDayLoading(false);
-    }
-  };
+  // Empty-state CTA: opens the Plan Store. The atomic createWithPlans IPC is called from
+  // handlePickerConfirm when no trading_day exists yet — keeps the rule that a day must
+  // have at least one plan.
 
-  // Register save function with the app context so header button can call it
+  // Header "Save Plan" button — saves day notes only now (per-card numbers/outcomes auto-save on blur)
   const handleSaveDayPlan = useCallback(async () => {
     setSavingDayPlan(true);
     try {
       if (tradingDay) {
         await updateNotes(tradingDay.id, notes);
       }
-
-      const refs = Object.values(possibilityRefs.current);
-      for (const ref of refs) {
-        if (ref?.saveAll) await ref.saveAll();
-      }
-
-      // Save custom plans
-      if (customPlansRef.current?.saveAll) {
-        await customPlansRef.current.saveAll();
-      }
-
-      showNotification('Entire day plan saved successfully', 'success');
-      loadDay();
+      showNotification('Day notes saved', 'success');
     } catch (err) {
-      showNotification('Failed to save day plan', 'error');
+      showNotification('Failed to save', 'error');
     } finally {
       setSavingDayPlan(false);
     }
-  }, [tradingDay, notes, possibilityRefs]);
+  }, [tradingDay, notes]);
 
   useEffect(() => {
-    if (subView === 'plan') {
+    // Only expose the header "Save Day Plan" button once a day actually exists.
+    if (dayExists === true) {
       setSaveDayPlanFn(() => handleSaveDayPlan);
     } else {
       setSaveDayPlanFn(null);
     }
     return () => setSaveDayPlanFn(null);
-  }, [handleSaveDayPlan, subView]);
+  }, [handleSaveDayPlan, dayExists]);
 
-  const handleRefresh = useCallback(() => {
-    loadDay(false);
-  }, [loadDay]);
+  const handlePlanChange = useCallback(async () => {
+    if (!tradingDay) return;
+    const plans = await getByTradingDay(tradingDay.id);
+    setDayPlans(plans);
+  }, [tradingDay, getByTradingDay]);
+
+  const handlePickerConfirm = async (templateIds) => {
+    try {
+      if (!tradingDay) {
+        // Lazy creation — atomic insert of trading_day + selected plans.
+        const res = await window.api.tradingDay.createWithPlans({
+          tradeDate: selectedDate,
+          symbolId: selectedSymbol.id,
+          templateIds,
+        });
+        if (!res.success) throw new Error(res.error || 'Failed to create day');
+        showNotification(`${templateIds.length} plan(s) added`, 'success');
+        setPickerOpen(false);
+        if (refreshDatesFn) refreshDatesFn();
+        await loadDay();
+      } else {
+        let order = dayPlans.length;
+        for (const tplId of templateIds) {
+          await createFromTemplate({ tradingDayId: tradingDay.id, templateId: tplId, sortOrder: order++ });
+        }
+        showNotification(`${templateIds.length} plan(s) added`, 'success');
+        setPickerOpen(false);
+        await handlePlanChange();
+      }
+    } catch (err) {
+      showNotification(err.message || 'Failed to add plans', 'error');
+    }
+  };
 
   if (!selectedSymbol) {
     return (
@@ -122,77 +129,44 @@ export default function PlanningView() {
     );
   }
 
-  // Show create day prompt if no day exists for this date
   if (dayExists === false) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-surface-700 flex items-center justify-center">
-          <svg className="w-7 h-7 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        </div>
-        <div className="text-center">
-          <p className="text-gray-300 font-medium">{t('noTradingPlanFor').replace('{date}', formatDate(selectedDate))}</p>
-          <p className="text-sm text-gray-500 mt-1">{t('createDayPrompt')}</p>
-        </div>
-        <button onClick={handleCreateDay} className="btn-primary text-sm px-6 py-2">
-          {t('createDayPlan')}
-        </button>
-      </div>
-    );
-  }
-
-  const allPossibilities = tradingDay?.possibilities || [];
-  const filteredPossibilities = showNoPlan
-    ? allPossibilities
-    : allPossibilities.filter((p) => p.has_plan === 1);
-  const bullishPossibilities = filteredPossibilities.filter((p) => p.bias === 'Bullish');
-  const bearishPossibilities = filteredPossibilities.filter((p) => p.bias === 'Bearish');
-
-  // Plan Analysis sub-view
-  if (subView === 'analysis') {
-    return (
-      <div className="space-y-4">
-        <div className="flex gap-1 p-1 bg-surface-800 rounded-lg w-fit">
-          <button
-            onClick={() => setSubView('plan')}
-            className="px-4 py-2 rounded-md text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"
-          >
-            {t('newPlan')}
-          </button>
-          <button
-            onClick={() => setSubView('analysis')}
-            className="px-4 py-2 rounded-md text-sm font-medium bg-primary-600 text-white transition-colors"
-          >
-            {t('planAnalysis')}
+      <>
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-surface-700 flex items-center justify-center">
+            <svg className="w-7 h-7 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div className="text-center">
+            <p className="text-gray-300 font-medium">{t('noTradingPlanFor').replace('{date}', formatDate(selectedDate))}</p>
+            <p className="text-sm text-gray-500 mt-1 max-w-md">{t('pickPlansForDayHint')}</p>
+          </div>
+          <button onClick={() => setPickerOpen(true)} className="btn-primary text-sm px-6 py-2">
+            {t('pickPlansForDay')}
           </button>
         </div>
-        <BehaviorView />
-      </div>
+
+        {pickerOpen && (
+          <PlanStorePicker
+            tradingDay={null}
+            onConfirm={handlePickerConfirm}
+            onClose={() => setPickerOpen(false)}
+          />
+        )}
+      </>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Sub-navigation */}
-      <div className="flex gap-1 p-1 bg-surface-800 rounded-lg w-fit">
-        <button
-          onClick={() => setSubView('plan')}
-          className="px-4 py-2 rounded-md text-sm font-medium bg-primary-600 text-white transition-colors"
-        >
-          {t('newPlan')}
-        </button>
-        <button
-          onClick={() => setSubView('analysis')}
-          className="px-4 py-2 rounded-md text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"
-        >
-          {t('planAnalysis')}
-        </button>
-      </div>
-
-      {/* Day Notes - Compact */}
+      {/* Day notes */}
       <div className="relative">
-        <div className={`flex items-center gap-2 transition-all duration-200 ${notesFocused ? 'glass-card p-3' : 'px-3 py-2 rounded-lg bg-surface-800/50 border border-surface-600/30 hover:border-surface-500/50'}`}>
+        <div className={`flex items-center gap-2 transition-all duration-200 ${
+          notesFocused
+            ? 'glass-card p-3'
+            : 'px-3 py-2 rounded-lg bg-surface-800/50 border border-surface-600/30 hover:border-surface-500/50'
+        }`}>
           <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
           </svg>
@@ -211,71 +185,65 @@ export default function PlanningView() {
         </div>
       </div>
 
-      {/* Filter toggle */}
-      <div className="flex justify-end">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <span className="text-xs text-gray-400">{t('showNoPlan')}</span>
-          <input
-            type="checkbox"
-            checked={showNoPlan}
-            onChange={(e) => setShowNoPlan(e.target.checked)}
-            className="w-4 h-4 rounded border-surface-500 text-primary-500 focus:ring-primary-500/30 bg-surface-700"
-          />
-        </label>
-      </div>
-
-      {/* Bullish Possibilities */}
+      {/* Today's Plans */}
       <div>
-        <div className="flex items-center gap-2 mb-4">
-          <div className={`h-2 w-2 rounded-full bg-gradient-to-r ${BIAS_COLORS.Bullish.accent}`}></div>
-          <h3 className="section-title text-blue-400">{t('bullishDefaultPlans')}</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-gradient-to-r from-primary-500 to-cyan-500"></div>
+            <h3 className="section-title text-primary-300">{t('todaysPlans')}</h3>
+            {dayPlans.length > 0 && (
+              <span className="text-[10px] text-gray-500 ml-1">({dayPlans.length})</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {dayPlans.length > 0 && (
+              <button
+                onClick={() => setAllExpanded((v) => !v)}
+                className="text-[11px] text-gray-500 hover:text-gray-300 transition-colors"
+              >
+                {allExpanded ? 'Shrink All' : 'Expand All'}
+              </button>
+            )}
+            <button
+              onClick={() => setPickerOpen(true)}
+              className="text-xs px-3 py-1.5 rounded-lg bg-primary-600/20 border border-primary-500/30 text-primary-300 hover:bg-primary-600/30 transition-colors flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              {t('pickFromStore')}
+            </button>
+          </div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {bullishPossibilities.map((p) => {
-            const spec = POSSIBILITIES.find((sp) => sp.code === p.code);
-            return (
-              <PossibilityCard
-                key={p.id}
-                ref={(el) => { possibilityRefs.current[p.id] = el; }}
-                possibility={p}
-                spec={spec}
+
+        {dayPlans.length === 0 ? (
+          <div className="glass-card p-8 text-center">
+            <p className="text-sm text-gray-500">{t('noPlansForToday')}</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {dayPlans.map((plan) => (
+              <DayPlanCard
+                key={plan.id}
+                dayPlan={plan}
                 tradingDay={tradingDay}
-                onRefresh={handleRefresh}
+                isLastPlan={dayPlans.length === 1}
+                expandedOverride={allExpanded}
+                onChange={handlePlanChange}
+                onDayDeleted={() => { loadDay(true); if (refreshDatesFn) refreshDatesFn(); }}
               />
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Bearish Possibilities */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <div className={`h-2 w-2 rounded-full bg-gradient-to-r ${BIAS_COLORS.Bearish.accent}`}></div>
-          <h3 className="section-title text-red-400">{t('bearishDefaultPlans')}</h3>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {bearishPossibilities.map((p) => {
-            const spec = POSSIBILITIES.find((sp) => sp.code === p.code);
-            return (
-              <PossibilityCard
-                key={p.id}
-                ref={(el) => { possibilityRefs.current[p.id] = el; }}
-                possibility={p}
-                spec={spec}
-                tradingDay={tradingDay}
-                onRefresh={handleRefresh}
-              />
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Custom Plans */}
-      <CustomPlansSection
-        ref={customPlansRef}
-        tradingDay={tradingDay}
-        onRefresh={handleRefresh}
-      />
+      {pickerOpen && (
+        <PlanStorePicker
+          tradingDay={tradingDay}
+          onConfirm={handlePickerConfirm}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -73,13 +73,12 @@ export default function BackupView() {
       } else if (result.success) {
         const s = result.stats;
         const parts = [
-          s.tradingDays   && `${s.tradingDays} days`,
-          s.possibilities && `${s.possibilities} possibilities`,
-          s.outcomePlans  && `${s.outcomePlans} outcome plans`,
-          s.verdicts      && `${s.verdicts} verdicts`,
-          s.customPlans   && `${s.customPlans} custom plans`,
-          s.intradayNotes && `${s.intradayNotes} notes`,
-          s.stockPlans    && `${s.stockPlans} swing plans`,
+          s.planGroups    && `${s.planGroups} plan groups`,
+          s.planTemplates && `${s.planTemplates} templates`,
+          s.tradingDays   && `${s.tradingDays} trading days`,
+          s.dayPlans      && `${s.dayPlans} day plans`,
+          s.intradayNotes && `${s.intradayNotes} intraday notes`,
+          s.swingPlans    && `${s.swingPlans} swing plans`,
           s.screenshots   && `${s.screenshots} images`,
         ].filter(Boolean);
         const summary = parts.length

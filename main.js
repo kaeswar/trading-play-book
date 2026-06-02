@@ -5,16 +5,14 @@ const fs = require('fs');
 const { initializeDatabase, getDb } = require('./src/main/db/database');
 const symbolRepo = require('./src/main/db/symbolRepo');
 const tradingDayRepo = require('./src/main/db/tradingDayRepo');
-const possibilityRepo = require('./src/main/db/possibilityRepo');
-const outcomePlanRepo = require('./src/main/db/outcomePlanRepo');
-const screenshotRepo = require('./src/main/db/screenshotRepo');
-const verdictRepo = require('./src/main/db/verdictRepo');
-const stockPlanRepo = require('./src/main/db/stockPlanRepo');
-const verdictScreenshotRepo = require('./src/main/db/verdictScreenshotRepo');
-const customPlanRepo = require('./src/main/db/customPlanRepo');
-const customPlanScreenshotRepo = require('./src/main/db/customPlanScreenshotRepo');
+const swingPlanRepo = require('./src/main/db/swingPlanRepo');
+const swingPlanScreenshotRepo = require('./src/main/db/swingPlanScreenshotRepo');
 const intradayNoteRepo = require('./src/main/db/intradayNoteRepo');
 const intradayNoteScreenshotRepo = require('./src/main/db/intradayNoteScreenshotRepo');
+const planGroupRepo = require('./src/main/db/planGroupRepo');
+const planTemplateRepo = require('./src/main/db/planTemplateRepo');
+const dayPlanRepo = require('./src/main/db/dayPlanRepo');
+const dayPlanScreenshotRepo = require('./src/main/db/dayPlanScreenshotRepo');
 const planningService = require('./src/main/services/PlanningService');
 const exportService = require('./src/main/services/ExportService');
 const backupService = require('./src/main/services/BackupService');
@@ -160,6 +158,32 @@ function registerIpcHandlers() {
   );
   ipcMain.handle('tradingDay:getAll', () => tradingDayRepo.getAll());
   ipcMain.handle('tradingDay:create', (_, data) => planningService.createTradingDay(data));
+
+  // Atomic: create trading_day + one or more day_plans in a single transaction.
+  // Used by the "Pick Plans for This Day" empty-state flow so a day never exists without plans.
+  ipcMain.handle('tradingDay:createWithPlans', (_, { tradeDate, symbolId, notes, templateIds }) => {
+    try {
+      const db = getDb();
+      const result = db.transaction(() => {
+        let day = tradingDayRepo.getByDateAndSymbol(tradeDate, symbolId);
+        if (!day) {
+          day = tradingDayRepo.create({ tradeDate, symbolId, notes });
+        }
+        let order = dayPlanRepo.getByTradingDay(day.id).length;
+        const plans = [];
+        for (const tplId of (templateIds || [])) {
+          plans.push(dayPlanRepo.createFromTemplate({
+            tradingDayId: day.id, templateId: tplId, sortOrder: order++,
+          }));
+        }
+        return { day, plans };
+      })();
+      return { success: true, ...result };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
   ipcMain.handle('tradingDay:updateNotes', (_, id, notes) =>
     tradingDayRepo.updateNotes(id, notes)
   );
@@ -167,58 +191,6 @@ function registerIpcHandlers() {
   ipcMain.handle('tradingDay:updateDate', (_, id, newDate) => tradingDayRepo.updateDate(id, newDate));
   ipcMain.handle('tradingDay:delete', (_, id) => tradingDayRepo.delete(id));
   ipcMain.handle('tradingDay:getAvailableDates', (_, symbolId) => tradingDayRepo.getAvailableDates(symbolId));
-
-  // --- Possibility handlers ---
-  ipcMain.handle('possibility:getByTradingDay', (_, tradingDayId) =>
-    possibilityRepo.getByTradingDay(tradingDayId)
-  );
-  ipcMain.handle('possibility:create', (_, data) => possibilityRepo.create(data));
-  ipcMain.handle('possibility:updateHasPlan', (_, id, hasPlan) =>
-    possibilityRepo.updateHasPlan(id, hasPlan)
-  );
-
-  // --- Outcome Plan handlers ---
-  ipcMain.handle('outcomePlan:getByPossibility', (_, possibilityId) =>
-    outcomePlanRepo.getByPossibility(possibilityId)
-  );
-  ipcMain.handle('outcomePlan:create', (_, data) => outcomePlanRepo.create(data));
-  ipcMain.handle('outcomePlan:update', (_, id, data) => outcomePlanRepo.update(id, data));
-  ipcMain.handle('outcomePlan:delete', (_, id) => {
-    // Clean up intraday note screenshot files before deleting
-    const notes = intradayNoteRepo.getByOutcomePlan(id);
-    for (const note of notes) {
-      intradayNoteScreenshotRepo.deleteByIntradayNote(note.id);
-    }
-    return outcomePlanRepo.delete(id);
-  });
-
-  // --- Screenshot handlers ---
-  ipcMain.handle('screenshot:getByOutcomePlan', (_, outcomePlanId) =>
-    screenshotRepo.getByOutcomePlan(outcomePlanId)
-  );
-  ipcMain.handle('screenshot:create', (_, data) => screenshotRepo.create(data));
-  ipcMain.handle('screenshot:delete', (_, id) => {
-    const ss = screenshotRepo.getById(id);
-    if (ss) {
-      const fullPath = path.join(app.getPath('userData'), ss.file_path);
-      if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
-    }
-    return screenshotRepo.delete(id);
-  });
-
-  // --- Verdict handlers ---
-  ipcMain.handle('verdict:getByTradingDay', (_, tradingDayId) =>
-    verdictRepo.getByTradingDay(tradingDayId)
-  );
-  ipcMain.handle('verdict:create', (_, data) => verdictRepo.create(data));
-  ipcMain.handle('verdict:update', (_, id, data) => verdictRepo.update(id, data));
-
-  // --- Verdict Screenshot handlers ---
-  ipcMain.handle('verdictScreenshot:getByVerdict', (_, verdictId) =>
-    verdictScreenshotRepo.getByVerdict(verdictId)
-  );
-  ipcMain.handle('verdictScreenshot:create', (_, data) => verdictScreenshotRepo.create(data));
-  ipcMain.handle('verdictScreenshot:delete', (_, id) => verdictScreenshotRepo.delete(id));
 
   // --- Image file handlers ---
   ipcMain.handle('image:import', async (_, sourcePath, symbolName, date, fileName) => {
@@ -283,7 +255,7 @@ function registerIpcHandlers() {
 
   ipcMain.handle('dialog:openFile', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openFile', 'multiSelections'],
+      properties: ['openFile'],
       filters: [
         { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] },
       ],
@@ -291,64 +263,83 @@ function registerIpcHandlers() {
     return result.filePaths;
   });
 
-  // --- Query handlers (Phase 3) ---
+  // --- Query handlers (Gallery) ---
   ipcMain.handle('query:getFilteredDays', (_, filters) => {
     return tradingDayRepo.getFiltered(filters);
   });
 
   ipcMain.handle('query:getMetrics', (_, symbolId) => {
-    return verdictRepo.getMetrics(symbolId);
+    const db = getDb();
+    const where = symbolId ? 'WHERE td.symbol_id = ?' : '';
+    const args  = symbolId ? [symbolId] : [];
+    const row = db.prepare(`
+      SELECT
+        COUNT(DISTINCT td.id) AS totalDays,
+        COUNT(dp.id)          AS totalPlans,
+        SUM(CASE WHEN dp.execution_status = 'Successful'   THEN 1 ELSE 0 END) AS successfulPlans,
+        SUM(CASE WHEN dp.execution_status = 'Failed'       THEN 1 ELSE 0 END) AS failedPlans,
+        SUM(CASE WHEN dp.execution_status = 'Cancelled'    THEN 1 ELSE 0 END) AS cancelledPlans,
+        SUM(CASE WHEN dp.execution_status = 'Cost-to-Cost' THEN 1 ELSE 0 END) AS costToCostPlans,
+        SUM(CASE WHEN dp.execution_status = 'UnPlanned'    THEN 1 ELSE 0 END) AS unplannedPlans,
+        SUM(CASE WHEN dp.execution_status = 'Waiting' OR dp.execution_status IS NULL THEN 1 ELSE 0 END) AS waitingPlans
+      FROM trading_day td
+      LEFT JOIN day_plan dp ON dp.trading_day_id = td.id
+      ${where}
+    `).get(...args);
+    const planned = db.prepare(`
+      SELECT COUNT(DISTINCT td.id) AS preparedDays
+      FROM trading_day td
+      JOIN day_plan dp ON dp.trading_day_id = td.id
+      ${where}
+    `).get(...args);
+    return {
+      totalDays:        row.totalDays || 0,
+      preparedDays:     planned.preparedDays || 0,
+      totalPlans:       row.totalPlans || 0,
+      successfulPlans:  row.successfulPlans || 0,
+      failedPlans:      row.failedPlans || 0,
+      cancelledPlans:   row.cancelledPlans || 0,
+      costToCostPlans:  row.costToCostPlans || 0,
+      unplannedPlans:   row.unplannedPlans || 0,
+      waitingPlans:     row.waitingPlans || 0,
+    };
   });
 
   // --- Stock Plan handlers ---
-  ipcMain.handle('stockPlan:getAll', () => stockPlanRepo.getAll());
-  ipcMain.handle('stockPlan:getById', (_, id) => stockPlanRepo.getById(id));
-  ipcMain.handle('stockPlan:create', (_, data) => stockPlanRepo.create(data));
-  ipcMain.handle('stockPlan:update', (_, id, data) => stockPlanRepo.update(id, data));
-  ipcMain.handle('stockPlan:updateExecutionStatus', (_, id, status) =>
-    stockPlanRepo.updateExecutionStatus(id, status)
-  );
-  ipcMain.handle('stockPlan:delete', (_, id) => stockPlanRepo.delete(id));
-  ipcMain.handle('stockPlan:search', (_, filters) => stockPlanRepo.search(filters));
-  ipcMain.handle('stockPlan:getDistinctStockNames', () => stockPlanRepo.getDistinctStockNames());
-
-  // --- Custom Plan handlers ---
-  ipcMain.handle('customPlan:getByTradingDay', (_, tradingDayId) =>
-    customPlanRepo.getByTradingDay(tradingDayId)
-  );
-  ipcMain.handle('customPlan:getById', (_, id) => customPlanRepo.getById(id));
-  ipcMain.handle('customPlan:create', (_, data) => customPlanRepo.create(data));
-  ipcMain.handle('customPlan:update', (_, id, data) => customPlanRepo.update(id, data));
-  ipcMain.handle('customPlan:updateVerdict', (_, id, data) =>
-    customPlanRepo.updateVerdict(id, data)
-  );
-  ipcMain.handle('customPlan:delete', (_, id) => {
-    // Clean up intraday note screenshot files + custom plan screenshot files before deleting
-    const notes = intradayNoteRepo.getByCustomPlan(id);
-    for (const note of notes) {
-      intradayNoteScreenshotRepo.deleteByIntradayNote(note.id);
-    }
-    customPlanScreenshotRepo.deleteByCustomPlan(id);
-    return customPlanRepo.delete(id);
+  // --- Swing Plan handlers ---
+  ipcMain.handle('swingPlan:search',  (_, filters) => swingPlanRepo.search(filters || {}));
+  ipcMain.handle('swingPlan:get',     (_, id) => swingPlanRepo.getById(id));
+  ipcMain.handle('swingPlan:createFromTemplate', (_, data) => {
+    try { return { success: true, swingPlan: swingPlanRepo.createFromTemplate(data) }; }
+    catch (err) { return { success: false, error: err.message }; }
   });
+  ipcMain.handle('swingPlan:updateNumbers', (_, id, data) => {
+    try { return { success: true, swingPlan: swingPlanRepo.updateNumbers(id, data) }; }
+    catch (err) { return { success: false, error: err.message }; }
+  });
+  ipcMain.handle('swingPlan:updateExecution', (_, id, data) => {
+    try { return { success: true, swingPlan: swingPlanRepo.updateExecution(id, data) }; }
+    catch (err) { return { success: false, error: err.message }; }
+  });
+  ipcMain.handle('swingPlan:delete', (_, id) => {
+    try {
+      swingPlanScreenshotRepo.deleteBySwingPlan(id);  // unlink files before FK cascade
+      swingPlanRepo.delete(id);
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  });
+  ipcMain.handle('swingPlan:getDistinctSymbols', () => swingPlanRepo.getDistinctSymbols());
 
-  // --- Custom Plan Screenshot handlers ---
-  ipcMain.handle('customPlanScreenshot:getByCustomPlan', (_, customPlanId) =>
-    customPlanScreenshotRepo.getByCustomPlan(customPlanId)
+  // --- Swing Plan Screenshot handlers ---
+  ipcMain.handle('swingPlanScreenshot:getBySwingPlan', (_, swingPlanId, kind) =>
+    swingPlanScreenshotRepo.getBySwingPlan(swingPlanId, kind)
   );
-  ipcMain.handle('customPlanScreenshot:create', (_, data) =>
-    customPlanScreenshotRepo.create(data)
-  );
-  ipcMain.handle('customPlanScreenshot:delete', (_, id) =>
-    customPlanScreenshotRepo.delete(id)
-  );
+  ipcMain.handle('swingPlanScreenshot:create', (_, data) => swingPlanScreenshotRepo.create(data));
+  ipcMain.handle('swingPlanScreenshot:delete', (_, id) => swingPlanScreenshotRepo.delete(id));
 
-  // --- Intraday Note handlers ---
-  ipcMain.handle('intradayNote:getByOutcomePlan', (_, outcomePlanId) =>
-    intradayNoteRepo.getByOutcomePlan(outcomePlanId)
-  );
-  ipcMain.handle('intradayNote:getByCustomPlan', (_, customPlanId) =>
-    intradayNoteRepo.getByCustomPlan(customPlanId)
+  // --- Intraday Note handlers (per day_plan) ---
+  ipcMain.handle('intradayNote:getByDayPlan', (_, dayPlanId) =>
+    intradayNoteRepo.getByDayPlan(dayPlanId)
   );
   ipcMain.handle('intradayNote:getByTradingDay', (_, tradingDayId) =>
     intradayNoteRepo.getByTradingDay(tradingDayId)
@@ -358,7 +349,6 @@ function registerIpcHandlers() {
   );
   ipcMain.handle('intradayNote:create', (_, data) => intradayNoteRepo.create(data));
   ipcMain.handle('intradayNote:update', (_, id, data) => intradayNoteRepo.update(id, data));
-  ipcMain.handle('intradayNote:updateAttachment', (_, id, data) => intradayNoteRepo.updateAttachment(id, data));
   ipcMain.handle('intradayNote:delete', (_, id) => {
     intradayNoteScreenshotRepo.deleteByIntradayNote(id);
     return intradayNoteRepo.delete(id);
@@ -456,6 +446,42 @@ function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle('export:planWiseToCSV', async (_, { templateId, symbolIds }) => {
+    try {
+      const data = exportService.buildPlanWiseExportData({ templateId, symbolIds });
+      if (data.plans.length === 0) return { success: false, error: 'No plans found for the selected template and symbols.' };
+      const now = new Date();
+      const dd   = String(now.getDate()).padStart(2, '0');
+      const mmm  = now.toLocaleString('en-US', { month: 'short' });
+      const yyyy = now.getFullYear();
+      const hh   = String(now.getHours()).padStart(2, '0');
+      const min  = String(now.getMinutes()).padStart(2, '0');
+      const ss   = String(now.getSeconds()).padStart(2, '0');
+      const safePlanName = data.planName.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_');
+      const defaultName  = `Export_${dd}_${mmm}_${yyyy}_${safePlanName}_TradingPlayBook_${hh}_${min}_${ss}.csv`;
+      const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Save Plan Wise CSV',
+        defaultPath: defaultName,
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+      });
+      if (canceled || !filePath) return { success: false, canceled: true };
+      exportService.exportPlanWiseToCSV(data, filePath);
+      return { success: true, filePath };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('swingPlan:getDistinctSymbolsByTemplate', (_, templateId) => {
+    try { return swingPlanRepo.getDistinctSymbolsByTemplate(templateId); }
+    catch { return []; }
+  });
+
+  ipcMain.handle('swingPlan:getDistinctTemplates', () => {
+    try { return swingPlanRepo.getDistinctTemplates(); }
+    catch { return []; }
+  });
+
   // --- Backup / Restore handlers ---
   ipcMain.handle('backup:export', async () => {
     try {
@@ -502,13 +528,13 @@ function registerIpcHandlers() {
 
     const monthly = db.prepare(`
       SELECT
-        strftime('%Y-%m', td.trade_date)                                             AS month,
-        COUNT(DISTINCT td.id)                                                        AS totalDays,
-        COUNT(DISTINCT v.id)                                                         AS verdictDays,
-        SUM(CASE WHEN v.had_plan = 1 THEN 1 ELSE 0 END)                             AS plannedDays,
-        SUM(CASE WHEN v.had_plan = 1 AND v.outcome = 'Accepted' THEN 1 ELSE 0 END)  AS acceptedDays
+        strftime('%Y-%m', td.trade_date) AS month,
+        COUNT(DISTINCT td.id)            AS totalDays,
+        COUNT(DISTINCT CASE WHEN dp.id IS NOT NULL THEN td.id END) AS plannedDays,
+        COUNT(dp.id)                     AS totalPlans,
+        SUM(CASE WHEN dp.execution_status = 'Successful' THEN 1 ELSE 0 END) AS successfulPlans
       FROM trading_day td
-      LEFT JOIN verdict v ON v.trading_day_id = td.id
+      LEFT JOIN day_plan dp ON dp.trading_day_id = td.id
       ${where}
       GROUP BY month
       ORDER BY month
@@ -516,14 +542,17 @@ function registerIpcHandlers() {
 
     const breakdown = db.prepare(`
       SELECT
-        COUNT(DISTINCT td.id)                                                                  AS totalDays,
-        COUNT(DISTINCT v.id)                                                                   AS verdictDays,
-        SUM(CASE WHEN v.id IS NULL THEN 1 ELSE 0 END)                                         AS noVerdict,
-        SUM(CASE WHEN v.id IS NOT NULL AND v.had_plan = 0 THEN 1 ELSE 0 END)                  AS noPlan,
-        SUM(CASE WHEN v.had_plan = 1 AND v.outcome = 'Accepted' THEN 1 ELSE 0 END)            AS accepted,
-        SUM(CASE WHEN v.had_plan = 1 AND v.outcome = 'Rejected' THEN 1 ELSE 0 END)            AS rejected
+        COUNT(DISTINCT td.id) AS totalDays,
+        COUNT(DISTINCT CASE WHEN dp.id IS NOT NULL THEN td.id END) AS plannedDays,
+        COUNT(dp.id)          AS totalPlans,
+        SUM(CASE WHEN dp.execution_status = 'Successful'   THEN 1 ELSE 0 END) AS successful,
+        SUM(CASE WHEN dp.execution_status = 'Failed'       THEN 1 ELSE 0 END) AS failed,
+        SUM(CASE WHEN dp.execution_status = 'Cancelled'    THEN 1 ELSE 0 END) AS cancelled,
+        SUM(CASE WHEN dp.execution_status = 'Cost-to-Cost' THEN 1 ELSE 0 END) AS costToCost,
+        SUM(CASE WHEN dp.execution_status = 'UnPlanned'    THEN 1 ELSE 0 END) AS unplanned,
+        SUM(CASE WHEN dp.id IS NOT NULL AND (dp.execution_status IS NULL OR dp.execution_status = 'Waiting') THEN 1 ELSE 0 END) AS waiting
       FROM trading_day td
-      LEFT JOIN verdict v ON v.trading_day_id = td.id
+      LEFT JOIN day_plan dp ON dp.trading_day_id = td.id
       ${where}
     `).get(...args);
 
@@ -534,21 +563,22 @@ function registerIpcHandlers() {
     const db = getDb();
 
     const statusBreakdown = db.prepare(`
-      SELECT COALESCE(execution_status, 'Waiting') AS status, COUNT(*) AS count
-      FROM stock_plan
-      GROUP BY status
+      SELECT execution_status AS status, COUNT(*) AS count
+      FROM swing_plan
+      GROUP BY execution_status
     `).all();
 
     const byTimeframe = db.prepare(`
       SELECT
         timeframe,
-        SUM(CASE WHEN execution_status = 'Pass'      THEN 1 ELSE 0 END) AS pass,
-        SUM(CASE WHEN execution_status = 'Fail'      THEN 1 ELSE 0 END) AS fail,
-        SUM(CASE WHEN execution_status = 'Partial'   THEN 1 ELSE 0 END) AS partial,
-        SUM(CASE WHEN execution_status = 'Cancelled' THEN 1 ELSE 0 END) AS cancelled,
-        SUM(CASE WHEN execution_status = 'Waiting' OR execution_status IS NULL THEN 1 ELSE 0 END) AS waiting,
+        SUM(CASE WHEN execution_status = 'Successful'   THEN 1 ELSE 0 END) AS successful,
+        SUM(CASE WHEN execution_status = 'Failed'       THEN 1 ELSE 0 END) AS failed,
+        SUM(CASE WHEN execution_status = 'Cancelled'    THEN 1 ELSE 0 END) AS cancelled,
+        SUM(CASE WHEN execution_status = 'Cost-to-Cost' THEN 1 ELSE 0 END) AS costToCost,
+        SUM(CASE WHEN execution_status = 'UnPlanned'    THEN 1 ELSE 0 END) AS unplanned,
+        SUM(CASE WHEN execution_status = 'Waiting'      THEN 1 ELSE 0 END) AS waiting,
         COUNT(*) AS total
-      FROM stock_plan
+      FROM swing_plan
       GROUP BY timeframe
       ORDER BY CASE timeframe
         WHEN 'Monthly' THEN 1 WHEN 'Weekly' THEN 2 WHEN 'Daily' THEN 3
@@ -558,12 +588,88 @@ function registerIpcHandlers() {
     const totals = db.prepare(`
       SELECT
         COUNT(*) AS total,
-        SUM(CASE WHEN execution_status = 'Pass'    THEN 1 ELSE 0 END) AS pass,
-        SUM(CASE WHEN execution_status = 'Fail'    THEN 1 ELSE 0 END) AS fail,
-        SUM(CASE WHEN execution_status = 'Partial' THEN 1 ELSE 0 END) AS partial
-      FROM stock_plan
+        SUM(CASE WHEN execution_status = 'Successful'   THEN 1 ELSE 0 END) AS successful,
+        SUM(CASE WHEN execution_status = 'Failed'       THEN 1 ELSE 0 END) AS failed,
+        SUM(CASE WHEN execution_status = 'Cost-to-Cost' THEN 1 ELSE 0 END) AS costToCost,
+        SUM(CASE WHEN execution_status = 'UnPlanned'    THEN 1 ELSE 0 END) AS unplanned
+      FROM swing_plan
     `).get();
 
     return { statusBreakdown, byTimeframe, totals };
   });
+
+  // --- Plan Group handlers ---
+  ipcMain.handle('planGroup:list', () => planGroupRepo.list());
+  ipcMain.handle('planGroup:create', (_, data) => {
+    try { return { success: true, group: planGroupRepo.create(data) }; }
+    catch (err) { return { success: false, error: err.message }; }
+  });
+  ipcMain.handle('planGroup:update', (_, id, data) => {
+    try { return { success: true, group: planGroupRepo.update(id, data) }; }
+    catch (err) { return { success: false, error: err.message }; }
+  });
+  ipcMain.handle('planGroup:delete', (_, id) => {
+    try { planGroupRepo.delete(id); return { success: true }; }
+    catch (err) { return { success: false, error: err.message }; }
+  });
+
+  // --- Plan Template handlers ---
+  ipcMain.handle('planTemplate:list', (_, filters) => planTemplateRepo.list(filters || {}));
+  ipcMain.handle('planTemplate:get', (_, id) => planTemplateRepo.getById(id));
+  ipcMain.handle('planTemplate:create', (_, data) => {
+    try { return { success: true, template: planTemplateRepo.create(data) }; }
+    catch (err) { return { success: false, error: err.message }; }
+  });
+  ipcMain.handle('planTemplate:update', (_, id, data) => {
+    try { return { success: true, template: planTemplateRepo.update(id, data) }; }
+    catch (err) { return { success: false, error: err.message }; }
+  });
+  ipcMain.handle('planTemplate:archive', (_, id, archived) => {
+    try { return { success: true, template: planTemplateRepo.archive(id, archived) }; }
+    catch (err) { return { success: false, error: err.message }; }
+  });
+  ipcMain.handle('planTemplate:delete', (_, id) => {
+    try { planTemplateRepo.delete(id); return { success: true }; }
+    catch (err) { return { success: false, error: err.message }; }
+  });
+  ipcMain.handle('planTemplate:clone', (_, id, overrideName) => {
+    try { return { success: true, template: planTemplateRepo.clone(id, overrideName) }; }
+    catch (err) { return { success: false, error: err.message }; }
+  });
+
+  // --- Day Plan handlers ---
+  ipcMain.handle('dayPlan:getByTradingDay', (_, tradingDayId) => dayPlanRepo.getByTradingDay(tradingDayId));
+  ipcMain.handle('dayPlan:get', (_, id) => dayPlanRepo.getById(id));
+  ipcMain.handle('dayPlan:createFromTemplate', (_, data) => {
+    try { return { success: true, dayPlan: dayPlanRepo.createFromTemplate(data) }; }
+    catch (err) { return { success: false, error: err.message }; }
+  });
+  ipcMain.handle('dayPlan:updateNumbers', (_, id, data) => {
+    try { return { success: true, dayPlan: dayPlanRepo.updateNumbers(id, data) }; }
+    catch (err) { return { success: false, error: err.message }; }
+  });
+  ipcMain.handle('dayPlan:updateExecution', (_, id, data) => {
+    try { return { success: true, dayPlan: dayPlanRepo.updateExecution(id, data) }; }
+    catch (err) { return { success: false, error: err.message }; }
+  });
+  ipcMain.handle('dayPlan:updateSortOrder', (_, id, sortOrder) => {
+    try { return { success: true, dayPlan: dayPlanRepo.updateSortOrder(id, sortOrder) }; }
+    catch (err) { return { success: false, error: err.message }; }
+  });
+  ipcMain.handle('dayPlan:delete', (_, id) => {
+    try {
+      // FK ON DELETE CASCADE drops intraday_note rows + day_plan_screenshot rows automatically.
+      // We still manually delete screenshot files first so the disk doesn't leak.
+      dayPlanScreenshotRepo.deleteByDayPlan(id);
+      dayPlanRepo.delete(id);
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  });
+
+  // --- Day Plan Screenshot handlers ---
+  ipcMain.handle('dayPlanScreenshot:getByDayPlan', (_, dayPlanId, kind) =>
+    dayPlanScreenshotRepo.getByDayPlan(dayPlanId, kind)
+  );
+  ipcMain.handle('dayPlanScreenshot:create', (_, data) => dayPlanScreenshotRepo.create(data));
+  ipcMain.handle('dayPlanScreenshot:delete', (_, id) => dayPlanScreenshotRepo.delete(id));
 }

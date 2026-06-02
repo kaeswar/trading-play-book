@@ -1,456 +1,325 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../store/appStore';
+import { useDayPlan } from '../../hooks/useDayPlan';
 import { useLanguage } from '../../hooks/useLanguage';
-import { useTradingDay } from '../../hooks/useTradingDay';
-import { useVerdict } from '../../hooks/useVerdict';
-import { POSSIBILITIES, OUTCOMES, BIAS_COLORS, OUTCOME_COLORS, CUSTOM_VERDICT_STATUSES, CUSTOM_VERDICT_COLORS, BEHAVIOR_TAGS, getOutcomeColors, formatPossibilityCode, formatDate } from '../../../shared/constants';
-import { useCustomPlan } from '../../hooks/useCustomPlan';
-import VerdictForm from './VerdictForm';
+import {
+  STOCK_PLAN_BIAS_COLORS, BEHAVIOR_TAGS, DAY_PLAN_STATUSES, DAY_PLAN_STATUS_COLORS,
+  formatDate, deriveBehaviorTag,
+} from '../../../shared/constants';
+import IntradayNotesModal from '../shared/IntradayNotesModal';
+import DayPlanScreenshotUploader from '../Phase1/DayPlanScreenshotUploader';
 
+// Editable post-market view. User updates each plan's execution_status + outcome_notes.
 export default function VerdictView() {
   const { selectedSymbol, selectedDate, showNotification } = useApp();
+  const { getByTradingDay, updateExecution } = useDayPlan();
   const { t } = useLanguage();
-  const { createOrGetTradingDay, getTradingDayDetails } = useTradingDay();
-  const { saveVerdict, getVerdict, getVerdictScreenshots, saveVerdictScreenshots } = useVerdict();
 
   const [tradingDay, setTradingDay] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [verdict, setVerdict] = useState(null);
-  const [verdictScreenshots, setVerdictScreenshots] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [customPlans, setCustomPlans] = useState([]);
-  const { getCustomPlans: loadCustomPlans, saveCustomPlanVerdict } = useCustomPlan();
+  const [dayPlans, setDayPlans]     = useState([]);
+  const [noteCounts, setNoteCounts] = useState({});
+  const [loading, setLoading]       = useState(true);
+  const [openModal, setOpenModal]   = useState(null);
+  const [allExpanded, setAllExpanded] = useState(false);
 
-  const loadDay = useCallback(async () => {
+  const loadAll = useCallback(async () => {
     if (!selectedSymbol || !selectedDate) return;
     setLoading(true);
     try {
-      const day = await createOrGetTradingDay(selectedDate, selectedSymbol.id);
-      if (day) {
-        const details = await getTradingDayDetails(day.id);
-        setTradingDay(details);
-        setVerdict(details?.verdict || null);
-
-        // Load verdict screenshots if verdict exists
-        if (details?.verdict) {
-          const screenshots = await getVerdictScreenshots(details.verdict.id);
-          setVerdictScreenshots(screenshots);
-        } else {
-          setVerdictScreenshots([]);
-        }
-
-        // Load custom plans
-        const plans = await loadCustomPlans(day.id);
-        setCustomPlans(plans);
+      const day = await window.api.tradingDay.getByDateAndSymbol(selectedDate, selectedSymbol.id);
+      if (!day) {
+        setTradingDay(null);
+        setDayPlans([]);
+        setNoteCounts({});
+        return;
       }
-    } catch (err) {
-      console.error('Failed to load day:', err);
+      setTradingDay(day);
+      const [plans, counts] = await Promise.all([
+        getByTradingDay(day.id),
+        window.api.intradayNote.countByTradingDay(day.id),
+      ]);
+      setDayPlans(plans);
+      setNoteCounts(counts || {});
     } finally {
       setLoading(false);
     }
-  }, [selectedSymbol, selectedDate]);
+  }, [selectedSymbol, selectedDate, getByTradingDay]);
 
-  useEffect(() => {
-    loadDay();
-  }, [loadDay]);
+  useEffect(() => { loadAll(); }, [loadAll]);
 
-  const handleSaveVerdict = async ({ possibilityCode, outcome, bias, notes, screenshots }) => {
-    const result = await saveVerdict({
-      tradingDayId: tradingDay.id,
-      possibilityCode,
-      outcome,
-      bias,
-      notes,
-    });
-
-    if (result) {
-      // Save screenshots
-      if (result.verdict) {
-        await saveVerdictScreenshots(result.verdict.id, screenshots || [], verdictScreenshots);
-        // Reload screenshots
-        const updatedScreenshots = await getVerdictScreenshots(result.verdict.id);
-        setVerdictScreenshots(updatedScreenshots);
-      }
-
-      setVerdict(result.verdict);
-      setShowForm(false);
-
-      if (result.wasUpdate) {
-        showNotification('Verdict updated', 'success');
-      } else if (!result.hadPlan) {
-        showNotification('Verdict recorded — noted as no plan day', 'info');
-      } else {
-        showNotification('Verdict saved', 'success');
-      }
-    } else {
-      showNotification('Failed to save verdict', 'error');
+  const handleStatusChange = async (planId, status) => {
+    const plan = dayPlans.find(p => p.id === planId);
+    if (!plan) return;
+    setDayPlans(prev => prev.map(p => p.id === planId ? { ...p, execution_status: status } : p));
+    try {
+      await updateExecution(planId, { executionStatus: status, outcomeNotes: plan.outcome_notes });
+    } catch (err) {
+      showNotification('Failed to update status', 'error');
+      await loadAll();
     }
   };
 
+  const handleNotesChange = (planId, notes) => {
+    setDayPlans(prev => prev.map(p => p.id === planId ? { ...p, outcome_notes: notes } : p));
+  };
+
+  const handleNotesBlur = async (planId) => {
+    const plan = dayPlans.find(p => p.id === planId);
+    if (!plan) return;
+    try {
+      await updateExecution(planId, { executionStatus: plan.execution_status, outcomeNotes: plan.outcome_notes });
+    } catch (err) {
+      showNotification('Failed to save notes', 'error');
+    }
+  };
+
+  if (!selectedSymbol) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-gray-500">{t('selectSymbol')}</p>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-400">Loading verdict...</p>
-        </div>
+      <div className="flex items-center justify-center h-32">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
       </div>
     );
   }
 
   if (!tradingDay) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="text-center max-w-sm">
-          <div className="w-16 h-16 bg-surface-700 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-medium text-gray-300 mb-2">End-of-Day Verdict</h3>
-          <p className="text-sm text-gray-500">
-            Select a symbol and date to record your trading verdict
-          </p>
-        </div>
+      <div className="glass-card p-12 text-center">
+        <p className="text-gray-500">{t('noTradingPlanFor').replace('{date}', formatDate(selectedDate))}</p>
       </div>
     );
   }
 
+  const successCount = dayPlans.filter(p => p.execution_status === 'Successful').length;
+  const failedCount  = dayPlans.filter(p => p.execution_status === 'Failed').length;
+  const c2cCount     = dayPlans.filter(p => p.execution_status === 'Cost-to-Cost').length;
+  const unplannedCount = dayPlans.filter(p => p.execution_status === 'UnPlanned').length;
+  const cancelledCount = dayPlans.filter(p => p.execution_status === 'Cancelled').length;
+  const waitingCount = dayPlans.filter(p => !p.execution_status || p.execution_status === 'Waiting').length;
+
   return (
-    <div className="space-y-6">
-
-      {/* ── Section 1: Default Plan Verdict ── */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-1 h-10 rounded-full bg-gradient-to-b from-primary-400 to-primary-600 flex-shrink-0"></div>
-            <div>
-              <h3 className="text-base font-semibold text-gray-100">{t('defaultPlanVerdict')}</h3>
-              <p className="text-[10px] text-gray-500 mt-0.5">
-                {selectedSymbol.name} &middot; {formatDate(selectedDate)} &middot; {t('openingScenario')}
-              </p>
-            </div>
+    <div className="space-y-5">
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-base font-semibold text-gray-200">Update Day's Verdict</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Write intraday notes, mark each plan's outcome, add review notes</p>
+            <p className="text-sm text-gray-400 mt-1">{tradingDay.symbol_name} · {formatDate(tradingDay.trade_date)}</p>
           </div>
-          {verdict && !showForm && (
-            <button onClick={() => setShowForm(true)} className="btn-secondary text-sm">
-              {t('editVerdict')}
-            </button>
-          )}
-        </div>
-
-        <div className="pl-4">
-          {(!verdict || showForm) ? (
-            <div className="card">
-              <VerdictForm
-                tradingDay={tradingDay}
-                existingVerdict={verdict}
-                existingScreenshots={verdictScreenshots}
-                onSave={handleSaveVerdict}
-                onCancel={verdict ? () => setShowForm(false) : null}
-              />
-            </div>
-          ) : (
-            <VerdictDisplay verdict={verdict} screenshots={verdictScreenshots} />
-          )}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Stat label="Plans" value={dayPlans.length} />
+            <Stat label="Successful" value={successCount} color="emerald" />
+            <Stat label="Failed" value={failedCount} color="red" />
+            {c2cCount > 0 && <Stat label="C2C" value={c2cCount} color="amber" />}
+            {unplannedCount > 0 && <Stat label="UnPlanned" value={unplannedCount} color="violet" />}
+            {cancelledCount > 0 && <Stat label="Cancelled" value={cancelledCount} color="gray" />}
+            {waitingCount > 0 && <Stat label="Waiting" value={waitingCount} color="gray" />}
+          </div>
         </div>
       </div>
 
-      {/* ── Section 2: Custom Plan Verdict ── */}
-      {customPlans.length > 0 && (
-        <div>
-          <div className="flex items-center gap-3 mb-4 pt-4 border-t border-surface-600/50">
-            <div className="w-1 h-10 rounded-full bg-gradient-to-b from-purple-500 to-fuchsia-500 flex-shrink-0"></div>
-            <div>
-              <h3 className="text-base font-semibold text-gray-100">{t('customPlanVerdict')}</h3>
-              <p className="text-[10px] text-gray-500 mt-0.5">
-                {customPlans.length} custom plan{customPlans.length > 1 ? 's' : ''} &middot; {t('markEachPlan')}
-              </p>
-            </div>
+      {dayPlans.length === 0 ? (
+        <div className="glass-card p-12 text-center">
+          <p className="text-gray-500">No plans were created for this day.</p>
+        </div>
+      ) : (
+        <>
+          <div className="flex justify-end">
+            <button
+              onClick={() => setAllExpanded(v => !v)}
+              className="text-[11px] text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              {allExpanded ? 'Shrink All' : 'Expand All'}
+            </button>
           </div>
-          <div className="pl-4 space-y-3">
-            {customPlans.map((plan) => (
-              <CustomPlanVerdictCard key={plan.id} plan={plan} onVerdictUpdate={loadDay} />
+          <div className="space-y-3">
+            {dayPlans.map(dp => (
+              <PlanRow
+                key={dp.id}
+                dayPlan={dp}
+                tradingDay={tradingDay}
+                noteCount={noteCounts[dp.id] || 0}
+                expandedOverride={allExpanded}
+                onStatusChange={(s) => handleStatusChange(dp.id, s)}
+                onNotesChange={(notes) => handleNotesChange(dp.id, notes)}
+                onNotesBlur={() => handleNotesBlur(dp.id)}
+                onOpenNotes={() => setOpenModal(dp)}
+              />
             ))}
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function VerdictDisplay({ verdict, screenshots = [] }) {
-  const possibility = POSSIBILITIES.find((p) => p.code === verdict.possibility_code);
-  const biasColors = possibility ? BIAS_COLORS[possibility.bias] : null;
-  const outcomeColors = getOutcomeColors(verdict.outcome, possibility?.bias);
-  const [viewerSrc, setViewerSrc] = useState(null);
-
-  const handleViewScreenshot = async (filePath) => {
-    const fullPath = await window.api.image.getFullPath(filePath);
-    if (fullPath) {
-      const dataUrl = await window.api.image.toDataUrl(fullPath);
-      if (dataUrl) setViewerSrc(dataUrl);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      {/* Verdict Card */}
-      <div className="card">
-        <div className="space-y-4">
-          {/* Possibility + Outcome */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 p-3 bg-surface-700/50 rounded-lg border border-surface-500">
-              <p className="text-[10px] text-gray-500 uppercase mb-1">Opening Scenario</p>
-              <div className="flex items-center gap-2">
-                {biasColors && (
-                  <span className={`badge text-[10px] ${biasColors.bg} ${biasColors.text} border ${biasColors.border}`}>
-                    {possibility.bias}
-                  </span>
-                )}
-                <p className="text-sm font-medium text-gray-200">
-                  {formatPossibilityCode(verdict.possibility_code)}
-                </p>
-              </div>
-              {possibility && (
-                <p className="text-xs text-gray-500 mt-1">{possibility.label}</p>
-              )}
-            </div>
-
-            <div className="flex-1 p-3 bg-surface-700/50 rounded-lg border border-surface-500">
-              <p className="text-[10px] text-gray-500 uppercase mb-1">Outcome</p>
-              <p className={`text-lg font-bold ${outcomeColors.text}`}>
-                {verdict.outcome}
-              </p>
-            </div>
-
-            <div className="flex-1 p-3 bg-surface-700/50 rounded-lg border border-surface-500">
-              <p className="text-[10px] text-gray-500 uppercase mb-1">Plan Status</p>
-              <p className={`text-sm font-medium ${verdict.had_plan ? 'text-emerald-400' : 'text-gray-400'}`}>
-                {verdict.had_plan ? 'Had Plan' : 'No Plan'}
-              </p>
-            </div>
-          </div>
-
-          {/* Notes */}
-          {verdict.notes && (
-            <div>
-              <p className="text-[10px] text-gray-500 uppercase mb-1">Notes</p>
-              <p className="text-sm text-gray-300 whitespace-pre-wrap">{verdict.notes}</p>
-            </div>
-          )}
-
-          {/* Screenshots */}
-          {screenshots.length > 0 && (
-            <div>
-              <p className="text-[10px] text-gray-500 uppercase mb-2">Screenshots</p>
-              <div className="flex gap-2 flex-wrap">
-                {screenshots.map((ss) => (
-                  <VerdictScreenshotThumb
-                    key={ss.id}
-                    filePath={ss.file_path}
-                    onClick={() => handleViewScreenshot(ss.file_path)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Timestamp */}
-          <div className="pt-3 border-t border-surface-500">
-            <p className="text-[10px] text-gray-600">
-              Recorded {verdict.entered_at ? new Date(verdict.entered_at).toLocaleString() : 'just now'}
-              {verdict.updated_at !== verdict.entered_at && (
-                <span> &middot; Updated {new Date(verdict.updated_at).toLocaleString()}</span>
-              )}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Full-size image viewer */}
-      {viewerSrc && (
-        <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 cursor-pointer"
-          onClick={() => setViewerSrc(null)}
-        >
-          <img src={viewerSrc} alt="Screenshot" className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" />
-          <button
-            onClick={() => setViewerSrc(null)}
-            className="absolute top-4 right-4 w-10 h-10 bg-surface-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white"
-          >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function VerdictScreenshotThumb({ filePath, onClick }) {
-  const [src, setSrc] = useState(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    window.api.image.getFullPath(filePath).then(async (fullPath) => {
-      if (fullPath) {
-        const dataUrl = await window.api.image.toDataUrl(fullPath);
-        if (dataUrl) setSrc(dataUrl);
-      }
-    });
-  }, [filePath]);
-
-  return (
-    <button
-      onClick={onClick}
-      className="relative w-16 h-16 rounded-lg overflow-hidden border border-surface-500/60 hover:border-primary-400/60 transition-all duration-200 hover:shadow-md hover:shadow-primary-500/10 hover:scale-105"
-    >
-      {src ? (
-        <>
-          <img
-            src={src}
-            alt="Screenshot"
-            className={`w-full h-full object-cover transition-all duration-200 hover:brightness-75 ${loaded ? 'opacity-100' : 'opacity-0'}`}
-            onLoad={() => setLoaded(true)}
-            onError={() => setSrc(null)}
-          />
-          {!loaded && (
-            <div className="absolute inset-0 bg-surface-700 animate-pulse rounded-lg" />
-          )}
         </>
-      ) : (
-        <div className="w-full h-full bg-surface-700 flex items-center justify-center">
-          <svg className="w-6 h-6 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <path d="M21 15l-5-5L5 21" />
-          </svg>
-        </div>
       )}
-    </button>
+
+      {openModal && (
+        <IntradayNotesModal
+          dayPlan={openModal}
+          tradingDay={tradingDay}
+          symbolName={selectedSymbol?.name}
+          date={selectedDate}
+          onClose={() => { setOpenModal(null); loadAll(); }}
+        />
+      )}
+    </div>
   );
 }
 
-function CustomPlanVerdictCard({ plan, onVerdictUpdate }) {
-  const { saveCustomPlanVerdict } = useCustomPlan();
-  const { t } = useLanguage();
-  const [verdictStatus, setVerdictStatus] = useState(plan.verdict_status || null);
-  const [verdictNotes, setVerdictNotes] = useState(plan.verdict_notes || '');
-  const [editingNotes, setEditingNotes] = useState(false);
-
-  const handleStatusClick = async (status) => {
-    const newStatus = verdictStatus === status ? null : status;
-    setVerdictStatus(newStatus);
-    try {
-      await saveCustomPlanVerdict(plan.id, { verdictStatus: newStatus, verdictNotes });
-      if (onVerdictUpdate) onVerdictUpdate();
-    } catch (err) {
-      console.error('Failed to save verdict:', err);
-    }
+function Stat({ label, value, color = 'gray' }) {
+  const tones = {
+    emerald: 'text-emerald-400',
+    red:     'text-red-400',
+    amber:   'text-amber-400',
+    violet:  'text-violet-300',
+    gray:    'text-gray-300',
   };
+  return (
+    <div className="text-center min-w-[60px]">
+      <p className={`text-2xl font-bold ${tones[color]}`}>{value}</p>
+      <p className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</p>
+    </div>
+  );
+}
 
-  const handleNotesSave = async () => {
-    try {
-      await saveCustomPlanVerdict(plan.id, { verdictStatus, verdictNotes });
-      setEditingNotes(false);
-      if (onVerdictUpdate) onVerdictUpdate();
-    } catch (err) {
-      console.error('Failed to save notes:', err);
-    }
-  };
+function PlanRow({ dayPlan, tradingDay, noteCount, expandedOverride, onStatusChange, onNotesChange, onNotesBlur, onOpenNotes }) {
+  const biasColors = STOCK_PLAN_BIAS_COLORS[dayPlan.bias];
+  const tag = deriveBehaviorTag(dayPlan.bias, dayPlan.behavior_tag);
+  const tagColors = tag && tag !== dayPlan.bias ? BEHAVIOR_TAGS[tag] : null;
+  const currentStatus = dayPlan.execution_status || 'Waiting';
+  const statusColors = DAY_PLAN_STATUS_COLORS[currentStatus];
 
-  const verdictColors = verdictStatus ? CUSTOM_VERDICT_COLORS[verdictStatus] : null;
-  const biasColors = plan.bias_tag ? BEHAVIOR_TAGS[plan.bias_tag] : null;
+  const [expanded, setExpanded] = React.useState(false);
+  const [outcomeShots, setOutcomeShots] = React.useState([]);
+
+  React.useEffect(() => {
+    if (expandedOverride !== undefined) setExpanded(expandedOverride);
+  }, [expandedOverride]);
+
+  const loadOutcomeShots = React.useCallback(async () => {
+    const list = await window.api.dayPlanScreenshot.getByDayPlan(dayPlan.id, 'outcome');
+    setOutcomeShots(list);
+  }, [dayPlan.id]);
+  React.useEffect(() => { loadOutcomeShots(); }, [loadOutcomeShots]);
 
   return (
-    <div className="card">
-      <div className="space-y-3">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="w-1.5 h-6 rounded-full bg-gradient-to-b from-purple-500 to-fuchsia-500 flex-shrink-0"></div>
-            <p className="text-sm text-gray-200 truncate">{plan.title || 'Untitled Plan'}</p>
-            {biasColors && (
-              <span className={`text-[10px] px-2 py-0.5 rounded-full ${biasColors.bg} ${biasColors.text} ${biasColors.border} border flex-shrink-0`}>
-                {plan.bias_tag}
-              </span>
-            )}
-          </div>
-          {verdictColors && (
-            <span className={`text-[10px] px-2 py-0.5 rounded-full ${verdictColors.bg} ${verdictColors.text} ${verdictColors.border} border flex-shrink-0`}>
-              {verdictStatus}
+    <div className="glass-card overflow-hidden">
+      {/* Header — clickable to collapse/expand */}
+      <div
+        className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-surface-700/30 transition-colors"
+        onClick={() => setExpanded(v => !v)}
+      >
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <p className="text-sm font-semibold text-gray-200 truncate">{dayPlan.name}</p>
+          {biasColors && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded ${biasColors.bg} ${biasColors.text} ${biasColors.border} border`}>
+              {dayPlan.bias}
+            </span>
+          )}
+          {tagColors && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded ${tagColors.bg} ${tagColors.text} ${tagColors.border} border`}>
+              {tag}
+            </span>
+          )}
+          {dayPlan.group_name && (
+            <span className="text-[10px] text-gray-500 truncate">{dayPlan.group_name}</span>
+          )}
+          {statusColors && currentStatus !== 'Waiting' && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded ${statusColors.bg} ${statusColors.text} ${statusColors.border} border`}>
+              {currentStatus}
             </span>
           )}
         </div>
-
-        {/* Target / Stop Out */}
-        {(plan.target != null || plan.stop_out != null) && (
-          <div className="flex gap-4">
-            {plan.target != null && (
-              <span className="text-xs text-emerald-400">Target: {plan.target}</span>
-            )}
-            {plan.stop_out != null && (
-              <span className="text-xs text-red-400">Stop Out: {plan.stop_out}</span>
-            )}
-          </div>
-        )}
-
-        {/* Verdict Status Buttons */}
-        <div>
-          <p className="text-[10px] text-gray-500 uppercase mb-2">Verdict</p>
-          <div className="flex gap-2">
-            {CUSTOM_VERDICT_STATUSES.map((status) => {
-              const colors = CUSTOM_VERDICT_COLORS[status];
-              const isActive = verdictStatus === status;
-              return (
-                <button
-                  key={status}
-                  onClick={() => handleStatusClick(status)}
-                  className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
-                    isActive
-                      ? `${colors.bg} ${colors.text} ${colors.border} font-medium`
-                      : 'bg-surface-800 border-surface-600 text-gray-400 hover:border-surface-500'
-                  }`}
-                >
-                  {t(status.toLowerCase())}
-                </button>
-              );
-            })}
-          </div>
+        <div className="flex items-center gap-3 shrink-0" onClick={e => e.stopPropagation()}>
+          {dayPlan.target != null && (
+            <span className="text-[11px] text-gray-500">
+              <span className="text-gray-600">T </span>
+              <span className="text-emerald-400 font-medium">{dayPlan.target}</span>
+            </span>
+          )}
+          {dayPlan.stop_out != null && (
+            <span className="text-[11px] text-gray-500">
+              <span className="text-gray-600">S </span>
+              <span className="text-red-400 font-medium">{dayPlan.stop_out}</span>
+            </span>
+          )}
+          <button
+            onClick={onOpenNotes}
+            className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium transition-colors flex items-center gap-1.5 ${
+              noteCount > 0
+                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 hover:bg-amber-500/30'
+                : 'bg-surface-700/60 border-surface-500/60 text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            {noteCount > 0 ? `Notes (${noteCount})` : 'Notes'}
+          </button>
         </div>
-
-        {/* Verdict Notes */}
-        {verdictStatus && (
-          <div>
-            {editingNotes || !verdictNotes ? (
-              <div className="flex gap-2">
-                <textarea
-                  value={verdictNotes}
-                  onChange={(e) => setVerdictNotes(e.target.value)}
-                  placeholder="Add verdict notes..."
-                  rows={2}
-                  className="flex-1 bg-surface-800 border border-surface-600 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-primary-500/50 resize-none"
-                />
-                <button
-                  onClick={handleNotesSave}
-                  className="self-end text-xs px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg transition-colors"
-                >
-                  {t('save')}
-                </button>
-              </div>
-            ) : (
-              <p
-                className="text-sm text-gray-400 cursor-pointer hover:text-gray-300"
-                onClick={() => setEditingNotes(true)}
-              >
-                {verdictNotes}
-                <span className="text-[10px] text-gray-600 ml-2">(click to edit)</span>
-              </p>
-            )}
-          </div>
-        )}
+        <svg
+          className={`w-4 h-4 text-gray-500 ml-3 transition-transform duration-200 shrink-0 ${expanded ? 'rotate-180' : ''}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
       </div>
+
+      {/* Body */}
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t border-surface-600/30">
+          {/* Execution status — editable chips */}
+          <div className="pt-3">
+            <label className="text-[10px] text-gray-500 uppercase mb-1.5 block">Execution Status</label>
+            <div className="flex flex-wrap gap-1.5">
+              {DAY_PLAN_STATUSES.map((s) => {
+                const colors = DAY_PLAN_STATUS_COLORS[s];
+                const active = currentStatus === s;
+                return (
+                  <button
+                    key={s}
+                    onClick={() => onStatusChange(s)}
+                    className={`text-[11px] px-2.5 py-1.5 rounded-lg border transition-all ${
+                      active
+                        ? `${colors.bg} ${colors.text} ${colors.border} font-medium`
+                        : 'bg-surface-800 border-surface-600 text-gray-400 hover:border-surface-500'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Outcome notes — editable */}
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase mb-1 block">Outcome Notes</label>
+            <textarea
+              value={dayPlan.outcome_notes || ''}
+              onChange={(e) => onNotesChange(e.target.value)}
+              onBlur={onNotesBlur}
+              rows={2}
+              placeholder="What happened on this plan today?"
+              className="input-field text-sm w-full resize-none"
+            />
+          </div>
+
+          {/* Outcome screenshots */}
+          <DayPlanScreenshotUploader
+            dayPlanId={dayPlan.id}
+            screenshots={outcomeShots}
+            tradingDay={tradingDay}
+            onRefresh={loadOutcomeShots}
+            kind="outcome"
+            label="Outcome Screenshot"
+          />
+        </div>
+      )}
     </div>
   );
 }

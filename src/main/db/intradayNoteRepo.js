@@ -1,16 +1,10 @@
 const { getDb } = require('./database');
 
 module.exports = {
-  getByOutcomePlan(outcomePlanId) {
+  getByDayPlan(dayPlanId) {
     return getDb().prepare(
-      'SELECT * FROM intraday_note WHERE outcome_plan_id = ? ORDER BY sort_order, note_time'
-    ).all(outcomePlanId);
-  },
-
-  getByCustomPlan(customPlanId) {
-    return getDb().prepare(
-      'SELECT * FROM intraday_note WHERE custom_plan_id = ? ORDER BY sort_order, note_time'
-    ).all(customPlanId);
+      'SELECT * FROM intraday_note WHERE day_plan_id = ? ORDER BY sort_order, note_time'
+    ).all(dayPlanId);
   },
 
   getByTradingDay(tradingDayId) {
@@ -23,10 +17,11 @@ module.exports = {
     return getDb().prepare('SELECT * FROM intraday_note WHERE id = ?').get(id);
   },
 
-  create({ tradingDayId, outcomePlanId, customPlanId, noteTime, action, status }) {
+  create({ tradingDayId, dayPlanId, noteTime, action, status }) {
+    if (!dayPlanId) throw new Error('dayPlanId is required');
     const result = getDb().prepare(
-      'INSERT INTO intraday_note (trading_day_id, outcome_plan_id, custom_plan_id, note_time, action, status) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(tradingDayId, outcomePlanId || null, customPlanId || null, noteTime, action || '', status || 'Not-Known');
+      'INSERT INTO intraday_note (trading_day_id, day_plan_id, note_time, action, status) VALUES (?, ?, ?, ?, ?)'
+    ).run(tradingDayId, dayPlanId, noteTime, action || '', status || 'Not-Known');
     return this.getById(result.lastInsertRowid);
   },
 
@@ -37,46 +32,23 @@ module.exports = {
     return this.getById(id);
   },
 
-  updateAttachment(id, { outcomePlanId, customPlanId }) {
-    getDb().prepare(
-      'UPDATE intraday_note SET outcome_plan_id = ?, custom_plan_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-    ).run(outcomePlanId || null, customPlanId || null, id);
-    return this.getById(id);
-  },
-
   delete(id) {
     return getDb().prepare('DELETE FROM intraday_note WHERE id = ?').run(id);
   },
 
-  deleteByOutcomePlan(outcomePlanId) {
-    return getDb().prepare('DELETE FROM intraday_note WHERE outcome_plan_id = ?').run(outcomePlanId);
+  deleteByDayPlan(dayPlanId) {
+    return getDb().prepare('DELETE FROM intraday_note WHERE day_plan_id = ?').run(dayPlanId);
   },
 
-  deleteByCustomPlan(customPlanId) {
-    return getDb().prepare('DELETE FROM intraday_note WHERE custom_plan_id = ?').run(customPlanId);
-  },
-
-  // Returns { outcomePlanCounts: {id: count}, customPlanCounts: {id: count} }
+  // Returns { [dayPlanId]: count }
   countByTradingDay(tradingDayId) {
-    const outcomePlanCounts = {};
-    const customPlanCounts = {};
-
-    const opRows = getDb().prepare(
-      `SELECT outcome_plan_id as parentId, COUNT(*) as cnt
-       FROM intraday_note
-       WHERE trading_day_id = ? AND outcome_plan_id IS NOT NULL
-       GROUP BY outcome_plan_id`
+    const rows = getDb().prepare(
+      `SELECT day_plan_id AS dayPlanId, COUNT(*) AS cnt
+       FROM intraday_note WHERE trading_day_id = ?
+       GROUP BY day_plan_id`
     ).all(tradingDayId);
-    for (const r of opRows) outcomePlanCounts[r.parentId] = r.cnt;
-
-    const cpRows = getDb().prepare(
-      `SELECT custom_plan_id as parentId, COUNT(*) as cnt
-       FROM intraday_note
-       WHERE trading_day_id = ? AND custom_plan_id IS NOT NULL
-       GROUP BY custom_plan_id`
-    ).all(tradingDayId);
-    for (const r of cpRows) customPlanCounts[r.parentId] = r.cnt;
-
-    return { outcomePlanCounts, customPlanCounts };
+    const counts = {};
+    for (const r of rows) counts[r.dayPlanId] = r.cnt;
+    return counts;
   },
 };

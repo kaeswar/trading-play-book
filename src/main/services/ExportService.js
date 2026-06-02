@@ -4,29 +4,24 @@ const os = require('os');
 const { BrowserWindow, app } = require('electron');
 
 const tradingDayRepo = require('../db/tradingDayRepo');
-const possibilityRepo = require('../db/possibilityRepo');
-const outcomePlanRepo = require('../db/outcomePlanRepo');
-const verdictRepo = require('../db/verdictRepo');
-const screenshotRepo = require('../db/screenshotRepo');
-const verdictScreenshotRepo = require('../db/verdictScreenshotRepo');
-const customPlanRepo = require('../db/customPlanRepo');
-const customPlanScreenshotRepo = require('../db/customPlanScreenshotRepo');
-const intradayNoteRepo = require('../db/intradayNoteRepo');
-const stockPlanRepo = require('../db/stockPlanRepo');
-
-const POSSIBILITY_LABELS = {
-  Open_Abv_PDR:    'Open above Previous Day Range',
-  Open_Abv_VAH_IR: 'Open above VAH and Inside Range',
-  Open_Abv_POC_IV: 'Open above POC and Inside VAH',
-  Open_Bel_POC_IV: 'Open below POC Inside VA',
-  Open_Bel_VAL_IR: 'Open below VAL and Inside Range',
-  Open_Bel_PDR:    'Open below Previous Day Range',
-};
+const dayPlanRepo = require('../db/dayPlanRepo');
+const dayPlanScreenshotRepo = require('../db/dayPlanScreenshotRepo');
+const swingPlanRepo = require('../db/swingPlanRepo');
+const swingPlanScreenshotRepo = require('../db/swingPlanScreenshotRepo');
 
 const PDF_FOOTER = `<div style="width:100%;font-size:8px;color:#666;padding:0 0.4in;display:flex;justify-content:space-between;align-items:center;font-family:Arial,sans-serif">
   <span>Donationware &nbsp;·&nbsp; Please donate if it is useful &nbsp;·&nbsp; UPI ID mentioned in the About window &nbsp;·&nbsp; Author: kaeswar &nbsp;·&nbsp; kaeswar@gmail.com</span>
   <span>Page <span class="pageNumber"></span> / <span class="totalPages"></span></span>
 </div>`;
+
+const EXEC_STYLE = {
+  Successful:    { bg: '#d1fae5', col: '#065f46' },
+  Failed:        { bg: '#fee2e2', col: '#991b1b' },
+  'Cost-to-Cost':{ bg: '#fef3c7', col: '#92400e' },
+  UnPlanned:     { bg: '#ede9fe', col: '#5b21b6' },
+  Cancelled:     { bg: '#f3f4f6', col: '#4b5563' },
+  Waiting:       { bg: '#fef3c7', col: '#92400e' },
+};
 
 function logoDataUrl() {
   try {
@@ -58,104 +53,45 @@ function csvEsc(v) {
 
 // ── Data aggregation ──────────────────────────────────────────────────────────
 
-function buildExportData({ symbolIds, dateFrom, dateTo, includeNotes,
-  dayFilter = 'all', verdictBias = '', possibilityDisplay = 'all',
-  forPdf = false }) {
+function buildExportData({ symbolIds, dateFrom, dateTo, forPdf = false }) {
   const days = tradingDayRepo.getForExport({ symbolIds, dateFrom, dateTo });
-
   const bySymbol = {};
 
   for (const day of days) {
-    const verdict = verdictRepo.getByTradingDay(day.id);
-    const rawPossibilities = possibilityRepo.getByTradingDay(day.id);
-    const rawCustomPlans = customPlanRepo.getByTradingDay(day.id);
+    const dayPlans = dayPlanRepo.getByTradingDay(day.id);
+    if (dayPlans.length === 0) continue; // day must have ≥1 plan now anyway
 
-    // Day filter
-    if (dayFilter === 'hasVerdict' && !verdict) continue;
-    if (dayFilter === 'hasPlan' && !rawPossibilities.some((p) => p.has_plan) && rawCustomPlans.length === 0) continue;
-    if (dayFilter === 'verdictHadPlan') {
-      if (!verdict) continue;
-      const playedOut = rawPossibilities.find((p) => p.code === verdict.possibility_code);
-      if (!playedOut?.has_plan) continue;
-    }
-
-    // Verdict bias filter
-    if (verdictBias && verdict?.bias !== verdictBias) continue;
-
-    // Possibility display filter (default plans)
-    const filteredPossibilities =
-      possibilityDisplay === 'playedOut' && verdict
-        ? rawPossibilities.filter((p) => p.code === verdict.possibility_code)
-        : possibilityDisplay === 'planned'
-        ? rawPossibilities.filter((p) => p.has_plan)
-        : rawPossibilities;
-
-    const possibilities = filteredPossibilities.map((p) => {
-      const outcomePlans = outcomePlanRepo.getByPossibility(p.id);
-      const accepted = outcomePlans.find((op) => op.outcome === 'Accepted') || null;
-      const rejected = outcomePlans.find((op) => op.outcome === 'Rejected') || null;
-
-      let acceptedScreenshots = [];
-      let rejectedScreenshots = [];
+    const enrichedPlans = dayPlans.map((dp) => {
+      let setupShots = [];
+      let outcomeShots = [];
       if (forPdf) {
-        if (accepted) {
-          acceptedScreenshots = screenshotRepo.getByOutcomePlan(accepted.id)
-            .map((ss) => ({ ...ss, dataUrl: imgToBase64(ss.file_path) }))
-            .filter((ss) => ss.dataUrl);
-        }
-        if (rejected) {
-          rejectedScreenshots = screenshotRepo.getByOutcomePlan(rejected.id)
-            .map((ss) => ({ ...ss, dataUrl: imgToBase64(ss.file_path) }))
-            .filter((ss) => ss.dataUrl);
-        }
+        const all = dayPlanScreenshotRepo.getByDayPlan(dp.id)
+          .map(ss => ({ ...ss, dataUrl: imgToBase64(ss.file_path) }))
+          .filter(ss => ss.dataUrl);
+        setupShots   = all.filter(s => (s.kind || 'setup') === 'setup');
+        outcomeShots = all.filter(s => s.kind === 'outcome');
       }
-
-      return { ...p, accepted, rejected, acceptedScreenshots, rejectedScreenshots };
+      return { ...dp, setupShots, outcomeShots };
     });
-
-    let verdictScreenshots = [];
-    if (forPdf && verdict) {
-      verdictScreenshots = verdictScreenshotRepo.getByVerdict(verdict.id)
-        .map((vs) => ({ ...vs, dataUrl: imgToBase64(vs.file_path) }))
-        .filter((vs) => vs.dataUrl);
-    }
-
-    // Custom plan display filter — played-out means verdict_status is set
-    const filteredCustomPlans =
-      possibilityDisplay === 'playedOut'
-        ? rawCustomPlans.filter((cp) => cp.verdict_status != null)
-        : rawCustomPlans;
-
-    const customPlans = filteredCustomPlans.map((cp) => {
-      let screenshots = [];
-      if (forPdf) {
-        screenshots = customPlanScreenshotRepo.getByCustomPlan(cp.id)
-          .map((ss) => ({ ...ss, dataUrl: imgToBase64(ss.file_path) }))
-          .filter((ss) => ss.dataUrl);
-      }
-      return { ...cp, screenshots };
-    });
-
-    // Intraday notes
-    const intradayNotes = includeNotes ? intradayNoteRepo.getByTradingDay(day.id) : [];
 
     if (!bySymbol[day.symbol_name]) bySymbol[day.symbol_name] = [];
     bySymbol[day.symbol_name].push({
       ...day,
-      possibilities,
-      verdict,
-      verdictScreenshots,
-      customPlans,
-      intradayNotes,
+      dayPlans: enrichedPlans,
     });
   }
 
-  // Summary metrics
   const allDays = Object.values(bySymbol).flat();
   const totalDays = allDays.length;
-  const preparedDays = allDays.filter((d) => d.verdict?.had_plan).length;
-  const acceptedCount = allDays.filter((d) => d.verdict?.outcome === 'Accepted').length;
-  const rejectedCount = allDays.filter((d) => d.verdict?.outcome === 'Rejected').length;
+  const preparedDays = allDays.filter((d) => d.dayPlans.length > 0).length;
+  let successfulPlans = 0, failedPlans = 0, totalPlans = 0;
+  for (const d of allDays) {
+    for (const dp of d.dayPlans) {
+      totalPlans++;
+      if (dp.execution_status === 'Successful') successfulPlans++;
+      else if (dp.execution_status === 'Failed') failedPlans++;
+    }
+  }
 
   return {
     bySymbol,
@@ -163,8 +99,9 @@ function buildExportData({ symbolIds, dateFrom, dateTo, includeNotes,
       totalDays,
       preparedDays,
       prepRate: totalDays > 0 ? Math.round((preparedDays / totalDays) * 100) : 0,
-      acceptedCount,
-      rejectedCount,
+      totalPlans,
+      successfulPlans,
+      failedPlans,
       dateFrom: dateFrom || null,
       dateTo: dateTo || null,
       symbolNames: Object.keys(bySymbol),
@@ -173,69 +110,38 @@ function buildExportData({ symbolIds, dateFrom, dateTo, includeNotes,
 }
 
 // ── CSV export ────────────────────────────────────────────────────────────────
+// Lean tabular layout: one row per day_plan, no summary header. Eight columns optimized
+// for Excel filtering across many days (filter by plan name, group, bias, status, etc.).
 
 function exportToCSV(exportData, filePath) {
-  const { bySymbol, summary } = exportData;
+  const { bySymbol } = exportData;
   const lines = [];
 
-  // Summary header block
-  lines.push('Trading Play Book — Export Report');
-  lines.push(`Symbols,${summary.symbolNames.join(' | ')}`);
-  lines.push(`Date Range,${summary.dateFrom || 'All'} to ${summary.dateTo || 'All'}`);
-  lines.push(`Total Days,${summary.totalDays}`);
-  lines.push(`Prepared,${summary.preparedDays} (${summary.prepRate}%)`);
-  lines.push(`Accepted,${summary.acceptedCount}`);
-  lines.push(`Rejected,${summary.rejectedCount}`);
-  lines.push('');
-
-  // Column headers
-  const headers = [
-    'Type', 'Date', 'Symbol', 'Day Notes',
-    'Possibility Code', 'Possibility Label', 'Bias', 'Has Plan',
-    'Accepted Target', 'Accepted Stop Out', 'Accepted Description',
-    'Rejected Target', 'Rejected Stop Out', 'Rejected Description',
-    'Custom Plan Title', 'Custom Plan Bias', 'Custom Plan Target', 'Custom Plan Stop Out', 'Custom Plan Verdict',
-    'Verdict Code', 'Verdict Outcome', 'Verdict Bias', 'Had Plan', 'Verdict Notes',
-    'Intraday Notes',
-  ];
+  const headers = ['Date', 'Symbol', 'Plan Name', 'Group', 'Bias', 'Target', 'Stop Out', 'Execution Status'];
   lines.push(headers.map(csvEsc).join(','));
 
+  // Flatten + sort by date ASC so Excel sees chronological rows
+  const rows = [];
   for (const [symbolName, days] of Object.entries(bySymbol)) {
     for (const day of days) {
-      const vd = day.verdict;
-      const notesStr = day.intradayNotes
-        .map((n) => `[${n.note_time}] ${n.status}: ${n.action}`)
-        .join(' | ');
-
-      // Possibility rows
-      for (const p of day.possibilities) {
-        lines.push([
-          'Possibility',
-          day.trade_date, symbolName, day.notes || '',
-          p.code, POSSIBILITY_LABELS[p.code] || p.code, p.bias, p.has_plan ? 'Yes' : 'No',
-          p.accepted?.target ?? '', p.accepted?.stop_out ?? '', p.accepted?.description ?? '',
-          p.rejected?.target ?? '', p.rejected?.stop_out ?? '', p.rejected?.description ?? '',
-          '', '', '', '', '',
-          vd?.possibility_code ?? '', vd?.outcome ?? '', vd?.bias ?? '',
-          vd != null ? (vd.had_plan ? 'Yes' : 'No') : '',
-          vd?.notes ?? '', notesStr,
-        ].map(csvEsc).join(','));
-      }
-
-      // Custom plan rows
-      for (const cp of day.customPlans) {
-        lines.push([
-          'Custom Plan',
-          day.trade_date, symbolName, day.notes || '',
-          '', '', '', '',
-          '', '', '', '', '', '',
-          cp.title, cp.bias_tag ?? '', cp.target ?? '', cp.stop_out ?? '', cp.verdict_status ?? '',
-          vd?.possibility_code ?? '', vd?.outcome ?? '', vd?.bias ?? '',
-          vd != null ? (vd.had_plan ? 'Yes' : 'No') : '',
-          vd?.notes ?? '', notesStr,
-        ].map(csvEsc).join(','));
+      for (const dp of day.dayPlans) {
+        rows.push({
+          date:    day.trade_date,
+          symbol:  symbolName,
+          name:    dp.name,
+          group:   dp.group_name || '',
+          bias:    dp.bias,
+          target:  dp.target ?? '',
+          stopOut: dp.stop_out ?? '',
+          status:  dp.execution_status || 'Waiting',
+        });
       }
     }
+  }
+  rows.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.symbol.localeCompare(b.symbol)));
+
+  for (const r of rows) {
+    lines.push([r.date, r.symbol, r.name, r.group, r.bias, r.target, r.stopOut, r.status].map(csvEsc).join(','));
   }
 
   fs.writeFileSync(filePath, '﻿' + lines.join('\r\n'), 'utf8');
@@ -246,25 +152,23 @@ function exportToCSV(exportData, filePath) {
 function buildPdfHtml(exportData) {
   const { bySymbol, summary } = exportData;
   const logo = logoDataUrl();
-
   const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  const verdictBadge = (vd) => {
-    if (!vd) return '<span style="color:#999">No Verdict</span>';
-    const bg = vd.outcome === 'Accepted' ? '#d1fae5' : '#fee2e2';
-    const col = vd.outcome === 'Accepted' ? '#065f46' : '#991b1b';
-    return `<span style="background:${bg};color:${col};padding:2px 10px;border-radius:10px;font-size:11px;font-weight:bold">${esc(vd.outcome)} · ${esc(vd.bias)}</span>`;
+  const execBadge = (status) => {
+    const s = status || 'Pending';
+    const { bg, col } = EXEC_STYLE[s] || EXEC_STYLE.Pending;
+    return `<span style="background:${bg};color:${col};padding:2px 10px;border-radius:10px;font-size:11px;font-weight:bold">${esc(s)}</span>`;
   };
 
-  const screenshotsHtml = (screenshots) => {
-    if (!screenshots || screenshots.length === 0) return '';
-    const imgs = screenshots.map((ss) =>
-      `<div style="display:inline-block;margin:4px"><img src="${ss.dataUrl}" style="max-width:220px;max-height:160px;border-radius:4px;border:1px solid #e0e0e0" /></div>`
-    ).join('');
-    return `<div style="margin-top:6px">${imgs}</div>`;
+  const screenshotsHtml = (shots) => {
+    if (!shots || shots.length === 0) return '';
+    return `<div style="margin-top:6px">${
+      shots.map((ss) => `<div style="display:inline-block;margin:4px"><img src="${ss.dataUrl}" style="max-width:220px;max-height:160px;border-radius:4px;border:1px solid #e0e0e0" /></div>`).join('')
+    }</div>`;
   };
 
   let body = '';
+  const biasColor = (b) => b && b.includes('Bullish') ? '#1d4ed8' : b && b.includes('Bearish') ? '#dc2626' : '#6b7280';
 
   for (const [symbolName, days] of Object.entries(bySymbol)) {
     body += `
@@ -274,110 +178,50 @@ function buildPdfHtml(exportData) {
         </div>`;
 
     for (const day of days) {
-      const vd = day.verdict;
+      const succCount = day.dayPlans.filter(p => p.execution_status === 'Successful').length;
+      const failCount = day.dayPlans.filter(p => p.execution_status === 'Failed').length;
+
       body += `
         <div style="border:1px solid #e0e0e0;border-radius:8px;margin-bottom:20px;overflow:hidden;page-break-inside:avoid">
-          <!-- Day header -->
           <div style="background:#4f46e5;color:white;padding:10px 16px;display:flex;justify-content:space-between;align-items:center">
             <div>
               <span style="font-size:15px;font-weight:bold">${esc(day.trade_date)}</span>
               ${day.notes ? `<span style="font-size:11px;opacity:0.8;margin-left:12px">${esc(day.notes)}</span>` : ''}
             </div>
-            <div>${verdictBadge(vd)}</div>
+            <div style="font-size:11px">
+              ${day.dayPlans.length} plans · ${succCount} successful · ${failCount} failed
+            </div>
           </div>
           <div style="padding:14px">`;
 
-      // Verdict detail
-      if (vd) {
-        body += `
-            <div style="background:#f5f3ff;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:11px">
-              <strong>Verdict:</strong> ${esc(vd.possibility_code)} &nbsp;·&nbsp;
-              ${esc(vd.outcome)} &nbsp;·&nbsp; ${esc(vd.bias)} &nbsp;·&nbsp;
-              Prepared: ${vd.had_plan ? 'Yes' : 'No'}
-              ${vd.notes ? `&nbsp;·&nbsp; Notes: ${esc(vd.notes)}` : ''}
-            </div>`;
-        if (day.verdictScreenshots.length > 0) {
-          body += `<div style="margin-bottom:12px">${screenshotsHtml(day.verdictScreenshots)}</div>`;
-        }
-      }
-
-      // Possibilities table
-      const hasAnyPlan = day.possibilities.some((p) => p.has_plan);
-      if (hasAnyPlan || day.possibilities.length > 0) {
-        body += `
-            <div style="font-size:11px;font-weight:bold;color:#4f46e5;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Default Plans</div>
-            <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:12px">
-              <thead>
-                <tr style="background:#f5f3ff">
-                  <th style="padding:5px 8px;text-align:left;border:1px solid #e0e0e0;color:#4f46e5">Scenario</th>
-                  <th style="padding:5px 8px;text-align:left;border:1px solid #e0e0e0;color:#4f46e5">Bias</th>
-                  <th style="padding:5px 8px;text-align:center;border:1px solid #e0e0e0;color:#4f46e5">Plan</th>
-                  <th style="padding:5px 8px;text-align:left;border:1px solid #e0e0e0;color:#4f46e5">Accepted (T / SL)</th>
-                  <th style="padding:5px 8px;text-align:left;border:1px solid #e0e0e0;color:#4f46e5">Rejected (T / SL)</th>
-                </tr>
-              </thead>
-              <tbody>`;
-        for (const p of day.possibilities) {
-          const biasCol = p.bias === 'Bullish' ? '#1d4ed8' : '#dc2626';
-          const acc = p.accepted;
-          const rej = p.rejected;
+      if (day.dayPlans.length === 0) {
+        body += `<div style="color:#999;font-size:12px">No plans created for this day.</div>`;
+      } else {
+        for (const dp of day.dayPlans) {
           body += `
-                <tr style="background:${p.bias === 'Bullish' ? '#eff6ff' : '#fef2f2'}">
-                  <td style="padding:5px 8px;border:1px solid #e0e0e0">
-                    <div style="font-weight:bold">${esc(p.code)}</div>
-                    <div style="font-size:10px;color:#666">${esc(POSSIBILITY_LABELS[p.code] || p.code)}</div>
-                  </td>
-                  <td style="padding:5px 8px;border:1px solid #e0e0e0;color:${biasCol};font-weight:bold">${esc(p.bias)}</td>
-                  <td style="padding:5px 8px;border:1px solid #e0e0e0;text-align:center">${p.has_plan ? '✓' : '—'}</td>
-                  <td style="padding:5px 8px;border:1px solid #e0e0e0">
-                    ${acc ? `${acc.target ?? '—'} / ${acc.stop_out ?? '—'}${acc.description ? `<div style="font-size:10px;color:#666;margin-top:2px">${esc(acc.description)}</div>` : ''}` : '—'}
-                    ${screenshotsHtml(p.acceptedScreenshots)}
-                  </td>
-                  <td style="padding:5px 8px;border:1px solid #e0e0e0">
-                    ${rej ? `${rej.target ?? '—'} / ${rej.stop_out ?? '—'}${rej.description ? `<div style="font-size:10px;color:#666;margin-top:2px">${esc(rej.description)}</div>` : ''}` : '—'}
-                    ${screenshotsHtml(p.rejectedScreenshots)}
-                  </td>
-                </tr>`;
-        }
-        body += `</tbody></table>`;
-      }
-
-      // Custom plans
-      if (day.customPlans.length > 0) {
-        body += `<div style="font-size:11px;font-weight:bold;color:#4f46e5;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Custom Plans</div>`;
-        for (const cp of day.customPlans) {
-          body += `
-            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px;margin-bottom:8px;font-size:11px">
-              <div style="font-weight:bold;margin-bottom:4px">${esc(cp.title)}${cp.bias_tag ? ` <span style="font-size:10px;color:#555;font-weight:normal">· ${esc(cp.bias_tag)}</span>` : ''}</div>
-              ${cp.trade_plan ? `<div style="color:#444;margin-bottom:4px">${esc(cp.trade_plan)}</div>` : ''}
-              <div style="color:#666">
-                ${cp.target ? `Target: ${cp.target}` : ''}
-                ${cp.stop_out ? ` &nbsp; SL: ${cp.stop_out}` : ''}
-                ${cp.verdict_status ? ` &nbsp; Verdict: <strong>${esc(cp.verdict_status)}</strong>` : ''}
+            <div style="border:1px solid #e0e0e0;border-radius:6px;margin-bottom:10px;padding:10px;page-break-inside:avoid">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <div>
+                  <span style="font-weight:bold;font-size:13px">${esc(dp.name)}</span>
+                  ${dp.group_name ? `<span style="font-size:10px;color:#888;margin-left:8px">${esc(dp.group_name)}</span>` : ''}
+                  <span style="color:${biasColor(dp.bias)};font-weight:bold;font-size:11px;margin-left:8px">${esc(dp.bias)}</span>
+                  ${dp.behavior_tag && dp.behavior_tag !== dp.bias ? `<span style="font-size:10px;color:#666;margin-left:6px">(${esc(dp.behavior_tag)})</span>` : ''}
+                </div>
+                <div>${execBadge(dp.execution_status)}</div>
               </div>
-              ${screenshotsHtml(cp.screenshots)}
+              ${dp.description ? `<div style="font-size:11px;color:#555;margin-bottom:6px">${esc(dp.description)}</div>` : ''}
+              <div style="font-size:11px;color:#444;margin-bottom:4px">
+                <strong>Target:</strong> ${dp.target ?? '—'} &nbsp;·&nbsp; <strong>Stop:</strong> ${dp.stop_out ?? '—'}
+              </div>
+              ${dp.setupShots && dp.setupShots.length > 0 ? `<div style="margin-top:6px"><div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Setup</div>${screenshotsHtml(dp.setupShots)}</div>` : ''}
+              ${dp.outcome_notes ? `<div style="font-size:11px;color:#555;margin-top:6px;padding-top:6px;border-top:1px dashed #ddd"><strong>Notes:</strong> ${esc(dp.outcome_notes)}</div>` : ''}
+              ${dp.outcomeShots && dp.outcomeShots.length > 0 ? `<div style="margin-top:6px"><div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Outcome</div>${screenshotsHtml(dp.outcomeShots)}</div>` : ''}
             </div>`;
         }
-      }
-
-      // Intraday notes
-      if (day.intradayNotes.length > 0) {
-        body += `<div style="font-size:11px;font-weight:bold;color:#4f46e5;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Intraday Notes</div>`;
-        body += `<div style="background:#f9fafb;border-radius:6px;padding:8px 12px;font-size:11px">`;
-        for (const note of day.intradayNotes) {
-          body += `
-            <div style="padding:4px 0;border-bottom:1px solid #e0e0e0;display:flex;gap:8px;align-items:baseline">
-              <span style="color:#4f46e5;font-weight:bold;min-width:50px">${esc(note.note_time)}</span>
-              <span style="background:#e0e7ff;color:#3730a3;font-size:10px;padding:1px 6px;border-radius:8px">${esc(note.status)}</span>
-              <span style="color:#333">${esc(note.action)}</span>
-            </div>`;
-        }
-        body += `</div>`;
       }
 
       body += `</div></div>`;
     }
-
     body += `</div>`;
   }
 
@@ -388,11 +232,10 @@ function buildPdfHtml(exportData) {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #1a1a2e; padding: 24px; }
-    @media print { .day-card { page-break-inside: avoid; } }
+    @media print { div { page-break-inside: avoid; } }
   </style>
 </head>
 <body>
-  <!-- Report header -->
   <div style="text-align:center;margin-bottom:28px;padding-bottom:16px;border-bottom:3px solid #4f46e5">
     <div style="display:inline-flex;align-items:center;gap:12px;justify-content:center">
       ${logo ? `<img src="${logo}" style="width:48px;height:48px;border-radius:10px" />` : ''}
@@ -402,17 +245,15 @@ function buildPdfHtml(exportData) {
       </div>
     </div>
   </div>
-
-  <!-- Summary -->
   <div style="background:#f5f3ff;border-radius:10px;padding:16px;margin-bottom:28px">
     <div style="font-size:12px;font-weight:bold;color:#4f46e5;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">Summary</div>
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;text-align:center">
       ${[
         ['Total Days', summary.totalDays],
         ['Prepared', `${summary.preparedDays} (${summary.prepRate}%)`],
-        ['Accepted', summary.acceptedCount],
-        ['Rejected', summary.rejectedCount],
-        ['Symbols', summary.symbolNames.join(', ')],
+        ['Total Plans', summary.totalPlans],
+        ['Successful', summary.successfulPlans],
+        ['Failed', summary.failedPlans],
       ].map(([label, value]) => `
         <div>
           <div style="font-size:20px;font-weight:bold;color:#4f46e5">${esc(String(value))}</div>
@@ -424,8 +265,6 @@ function buildPdfHtml(exportData) {
       ${summary.dateFrom || 'Start'} → ${summary.dateTo || 'Today'}
     </div>` : ''}
   </div>
-
-  <!-- Day data -->
   ${body}
 </body>
 </html>`;
@@ -437,9 +276,7 @@ async function exportToPDF(exportData, filePath) {
   fs.writeFileSync(tmpPath, html, 'utf8');
 
   const win = new BrowserWindow({
-    show: false,
-    width: 1200,
-    height: 900,
+    show: false, width: 1200, height: 900,
     webPreferences: { nodeIntegration: false, contextIsolation: true },
   });
 
@@ -448,50 +285,46 @@ async function exportToPDF(exportData, filePath) {
     win.webContents.once('did-fail-load', (_, __, ___, errDesc) => reject(new Error(errDesc)));
     win.loadFile(tmpPath);
   });
-
   await new Promise((r) => setTimeout(r, 400));
 
   const pdfBuffer = await win.webContents.printToPDF({
-    printBackground: true,
-    pageSize: 'A4',
-    displayHeaderFooter: true,
-    headerTemplate: '<span></span>',
-    footerTemplate: PDF_FOOTER,
+    printBackground: true, pageSize: 'A4',
+    displayHeaderFooter: true, headerTemplate: '<span></span>', footerTemplate: PDF_FOOTER,
     margins: { top: 0.4, bottom: 0.6, left: 0.4, right: 0.4 },
   });
 
   win.destroy();
   try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
-
   fs.writeFileSync(filePath, pdfBuffer);
 }
 
-// ── Swing data aggregation ────────────────────────────────────────────────────
+// ── Swing data (templatized swing_plan + screenshots) ─────────────────────────
+// CSV mirrors the intraday CSV style: lean tabular layout, no summary header.
+// PDF still rich — per-plan card with setup + outcome screenshot panels.
 
-function buildSwingExportData({ stockNames, executionStatus, dateFrom, dateTo, includeAnalysis, forPdf = false }) {
-  let plans = stockPlanRepo.search({
-    query: '',
-    executionStatus: executionStatus && executionStatus !== 'Waiting' ? executionStatus : '',
-    timeframe: '',
-    activeOnly: executionStatus === 'Waiting',
+function buildSwingExportData({ symbolIds, executionStatus, dateFrom, dateTo, forPdf = false }) {
+  let plans = swingPlanRepo.search({
+    executionStatus: executionStatus || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo:   dateTo || undefined,
   });
 
-  if (stockNames && stockNames.length > 0) {
-    plans = plans.filter((p) => stockNames.includes(p.stock_name));
-  }
-
-  if (dateFrom) {
-    plans = plans.filter((p) => p.created_at && p.created_at.substring(0, 10) >= dateFrom);
-  }
-  if (dateTo) {
-    plans = plans.filter((p) => p.created_at && p.created_at.substring(0, 10) <= dateTo);
+  // Filter by symbol IDs if requested (Gallery passes ID list)
+  if (Array.isArray(symbolIds) && symbolIds.length > 0) {
+    plans = plans.filter((p) => symbolIds.includes(p.symbol_id));
   }
 
   if (forPdf) {
-    plans = plans.map((p) => ({
-      ...p,
-      chartDataUrl: p.chart_path ? imgToBase64(p.chart_path) : null,
-    }));
+    plans = plans.map((p) => {
+      const all = swingPlanScreenshotRepo.getBySwingPlan(p.id)
+        .map(ss => ({ ...ss, dataUrl: imgToBase64(ss.file_path) }))
+        .filter(ss => ss.dataUrl);
+      return {
+        ...p,
+        setupShots:   all.filter(s => (s.kind || 'setup') === 'setup'),
+        outcomeShots: all.filter(s => s.kind === 'outcome'),
+      };
+    });
   }
 
   const byStatus = {};
@@ -502,76 +335,61 @@ function buildSwingExportData({ stockNames, executionStatus, dateFrom, dateTo, i
 
   return {
     plans,
-    includeAnalysis,
     summary: {
-      total: plans.length,
-      byStatus,
-      stockNames: [...new Set(plans.map((p) => p.stock_name))].sort(),
-      dateFrom: dateFrom || null,
-      dateTo: dateTo || null,
+      total: plans.length, byStatus,
+      symbolNames: [...new Set(plans.map((p) => p.symbol_name))].sort(),
+      dateFrom: dateFrom || null, dateTo: dateTo || null,
     },
   };
 }
 
-// ── Swing CSV ─────────────────────────────────────────────────────────────────
-
 function exportSwingToCSV(swingData, filePath) {
-  const { plans, summary, includeAnalysis } = swingData;
+  const { plans } = swingData;
   const lines = [];
 
-  lines.push('Trading Play Book — Swing Plans Export');
-  lines.push(`Stocks,${summary.stockNames.join(' | ')}`);
-  lines.push(`Date Range,${summary.dateFrom || 'All'} to ${summary.dateTo || 'All'}`);
-  lines.push(`Total Plans,${summary.total}`);
-  for (const [s, count] of Object.entries(summary.byStatus)) {
-    lines.push(`${csvEsc(s)},${count}`);
-  }
-  lines.push('');
-
   const headers = [
-    'Stock Name', 'Timeframe', 'Entry Price', 'Target Price', 'Stop Loss',
-    'Execution Status', 'Created Date', 'Updated Date',
+    'Plan Date', 'Symbol', 'Plan Name', 'Group', 'Timeframe',
+    'Bias', 'Entry', 'Target', 'Stop', 'Execution Status',
   ];
-  if (includeAnalysis) headers.splice(6, 0, 'Analysis');
   lines.push(headers.map(csvEsc).join(','));
 
-  for (const p of plans) {
-    const row = [
-      p.stock_name,
-      p.timeframe || '',
-      p.entry_price ?? '',
-      p.target_price ?? '',
-      p.stop_loss ?? '',
+  // Sort by plan_date ASC, then symbol
+  const sorted = [...plans].sort((a, b) => {
+    if (a.plan_date !== b.plan_date) return a.plan_date < b.plan_date ? -1 : 1;
+    return (a.symbol_name || '').localeCompare(b.symbol_name || '');
+  });
+
+  for (const p of sorted) {
+    lines.push([
+      p.plan_date, p.symbol_name, p.name, p.group_name || '', p.timeframe,
+      p.bias,
+      p.entry_price ?? '', p.target_price ?? '', p.stop_loss ?? '',
       p.execution_status || 'Waiting',
-      p.created_at ? p.created_at.substring(0, 10) : '',
-      p.updated_at ? p.updated_at.substring(0, 10) : '',
-    ];
-    if (includeAnalysis) row.splice(6, 0, p.analysis || '');
-    lines.push(row.map(csvEsc).join(','));
+    ].map(csvEsc).join(','));
   }
 
   fs.writeFileSync(filePath, '﻿' + lines.join('\r\n'), 'utf8');
 }
 
-// ── Swing PDF ─────────────────────────────────────────────────────────────────
-
 function buildSwingPdfHtml(swingData) {
-  const { plans, summary, includeAnalysis } = swingData;
+  const { plans, summary } = swingData;
   const logo = logoDataUrl();
   const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  const STATUS_STYLE = {
-    Pass:      { bg: '#d1fae5', col: '#065f46' },
-    Fail:      { bg: '#fee2e2', col: '#991b1b' },
-    Partial:   { bg: '#fef3c7', col: '#92400e' },
-    Cancelled: { bg: '#f3f4f6', col: '#4b5563' },
-    Waiting:   { bg: '#e0e7ff', col: '#3730a3' },
-  };
-
   const statusBadge = (raw) => {
     const s = raw || 'Waiting';
-    const { bg, col } = STATUS_STYLE[s] || STATUS_STYLE.Waiting;
+    const { bg, col } = EXEC_STYLE[s] || EXEC_STYLE.Waiting;
     return `<span style="background:${bg};color:${col};padding:2px 10px;border-radius:10px;font-size:11px;font-weight:bold">${esc(s)}</span>`;
+  };
+
+  const biasColor = (b) => b && b.includes('Bullish') ? '#1d4ed8' : b && b.includes('Bearish') ? '#dc2626' : '#6b7280';
+
+  const screenshotsHtml = (shots, label) => {
+    if (!shots || shots.length === 0) return '';
+    const imgs = shots.map((ss) =>
+      `<div style="display:inline-block;margin:4px"><img src="${ss.dataUrl}" style="max-width:220px;max-height:160px;border-radius:4px;border:1px solid #e0e0e0" /></div>`
+    ).join('');
+    return `<div style="margin-top:8px"><div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">${label}</div>${imgs}</div>`;
   };
 
   let body = '';
@@ -579,30 +397,38 @@ function buildSwingPdfHtml(swingData) {
     body += `
       <div style="border:1px solid #e0e0e0;border-radius:8px;margin-bottom:20px;overflow:hidden;page-break-inside:avoid">
         <div style="background:#4f46e5;color:white;padding:10px 16px;display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:15px;font-weight:bold">${esc(p.stock_name)}</div>
+          <div>
+            <span style="font-size:15px;font-weight:bold">${esc(p.symbol_name)}</span>
+            <span style="font-size:11px;opacity:0.85;margin-left:10px">${esc(p.name)}</span>
+            ${p.group_name ? `<span style="font-size:10px;opacity:0.7;margin-left:8px">${esc(p.group_name)}</span>` : ''}
+          </div>
           <div>${statusBadge(p.execution_status)}</div>
         </div>
         <div style="padding:14px">
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;text-align:center;font-size:11px">
-            ${[['Timeframe', p.timeframe || '—'], ['Entry', p.entry_price ?? '—'], ['Target', p.target_price ?? '—'], ['Stop Loss', p.stop_loss ?? '—']]
+          <div style="font-size:11px;color:#555;margin-bottom:6px">
+            <strong>Plan Date:</strong> ${esc(p.plan_date)}
+            &nbsp;·&nbsp; <strong>Timeframe:</strong> ${esc(p.timeframe)}
+            &nbsp;·&nbsp; <span style="color:${biasColor(p.bias)};font-weight:bold">${esc(p.bias)}</span>
+            ${p.behavior_tag && p.behavior_tag !== p.bias ? `<span style="font-size:10px;color:#666;margin-left:6px">(${esc(p.behavior_tag)})</span>` : ''}
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;text-align:center;font-size:11px">
+            ${[['Entry', p.entry_price ?? '—'], ['Target', p.target_price ?? '—'], ['Stop Loss', p.stop_loss ?? '—']]
               .map(([label, value]) => `
               <div style="background:#f5f3ff;border-radius:6px;padding:8px">
                 <div style="font-size:14px;font-weight:bold;color:#4f46e5">${esc(String(value))}</div>
                 <div style="font-size:10px;color:#666;text-transform:uppercase;margin-top:2px">${label}</div>
               </div>`).join('')}
           </div>
-          ${includeAnalysis && p.analysis ? `
-          <div style="background:#f9fafb;border-radius:6px;padding:10px;font-size:11px;color:#444;margin-bottom:12px;line-height:1.5">
-            ${esc(p.analysis)}
+          ${p.analysis ? `
+          <div style="background:#f9fafb;border-radius:6px;padding:10px;font-size:11px;color:#444;margin-bottom:8px;line-height:1.5">
+            <strong>Analysis:</strong> ${esc(p.analysis)}
           </div>` : ''}
-          ${p.chartDataUrl ? `
-          <div style="margin-top:10px">
-            <img src="${p.chartDataUrl}" style="max-width:100%;max-height:300px;border-radius:6px;border:1px solid #e0e0e0" />
+          ${screenshotsHtml(p.setupShots, 'Setup')}
+          ${p.outcome_notes ? `
+          <div style="background:#f9fafb;border-radius:6px;padding:10px;font-size:11px;color:#444;margin-top:8px;margin-bottom:8px;line-height:1.5">
+            <strong>Outcome Notes:</strong> ${esc(p.outcome_notes)}
           </div>` : ''}
-          <div style="font-size:10px;color:#999;margin-top:10px">
-            Created: ${p.created_at ? p.created_at.substring(0, 10) : '—'} &nbsp;·&nbsp;
-            Updated: ${p.updated_at ? p.updated_at.substring(0, 10) : '—'}
-          </div>
+          ${screenshotsHtml(p.outcomeShots, 'Outcome')}
         </div>
       </div>`;
   }
@@ -659,9 +485,7 @@ async function exportSwingToPDF(swingData, filePath) {
   fs.writeFileSync(tmpPath, html, 'utf8');
 
   const win = new BrowserWindow({
-    show: false,
-    width: 1200,
-    height: 900,
+    show: false, width: 1200, height: 900,
     webPreferences: { nodeIntegration: false, contextIsolation: true },
   });
 
@@ -670,22 +494,53 @@ async function exportSwingToPDF(swingData, filePath) {
     win.webContents.once('did-fail-load', (_, __, ___, errDesc) => reject(new Error(errDesc)));
     win.loadFile(tmpPath);
   });
-
   await new Promise((r) => setTimeout(r, 400));
 
   const pdfBuffer = await win.webContents.printToPDF({
-    printBackground: true,
-    pageSize: 'A4',
-    displayHeaderFooter: true,
-    headerTemplate: '<span></span>',
-    footerTemplate: PDF_FOOTER,
+    printBackground: true, pageSize: 'A4',
+    displayHeaderFooter: true, headerTemplate: '<span></span>', footerTemplate: PDF_FOOTER,
     margins: { top: 0.4, bottom: 0.6, left: 0.4, right: 0.4 },
   });
 
   win.destroy();
   try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
-
   fs.writeFileSync(filePath, pdfBuffer);
 }
 
-module.exports = { buildExportData, exportToCSV, exportToPDF, buildSwingExportData, exportSwingToCSV, exportSwingToPDF };
+// ── Plan-wise export (one template × N symbols → CSV) ─────────────────────────
+// Columns: Date, Symbol, Bias, Target, Stop, Execution Status
+// File name supplied by the caller (sanitised plan name).
+
+function buildPlanWiseExportData({ templateId, symbolIds }) {
+  let plans = swingPlanRepo.search({ templateId });
+  if (Array.isArray(symbolIds) && symbolIds.length > 0) {
+    plans = plans.filter((p) => symbolIds.includes(p.symbol_id));
+  }
+  const planName = plans.length > 0 ? plans[0].name : `plan_${templateId}`;
+  return { plans, planName };
+}
+
+function exportPlanWiseToCSV({ plans }, filePath) {
+  const lines = [];
+  lines.push(['Date', 'Symbol', 'Bias', 'Target', 'Stop', 'Execution Status'].map(csvEsc).join(','));
+
+  const sorted = [...plans].sort((a, b) => {
+    if (a.plan_date !== b.plan_date) return a.plan_date < b.plan_date ? -1 : 1;
+    return (a.symbol_name || '').localeCompare(b.symbol_name || '');
+  });
+
+  for (const p of sorted) {
+    lines.push([
+      p.plan_date,
+      p.symbol_name,
+      p.bias,
+      p.target_price ?? '',
+      p.stop_loss ?? '',
+      p.execution_status || 'Waiting',
+    ].map(csvEsc).join(','));
+  }
+
+  fs.writeFileSync(filePath, '﻿' + lines.join('\r\n'), 'utf8');
+}
+
+module.exports = { buildExportData, exportToCSV, exportToPDF, buildSwingExportData, exportSwingToCSV, exportSwingToPDF, buildPlanWiseExportData, exportPlanWiseToCSV };

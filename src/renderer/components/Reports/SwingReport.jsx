@@ -12,14 +12,15 @@ const AXIS = '#6b7280';
 const TT   = { backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '8px', padding: '8px 12px' };
 
 const C = {
-  pass:      '#10b981',
-  fail:      '#ef4444',
-  partial:   '#f59e0b',
-  cancelled: '#6b7280',
-  waiting:   '#6366f1',
+  Successful:    '#10b981',
+  Failed:        '#ef4444',
+  'Cost-to-Cost':'#f59e0b',
+  UnPlanned:     '#8b5cf6',
+  Cancelled:     '#6b7280',
+  Waiting:       '#6366f1',
 };
 
-const STATUS_ORDER = ['Pass', 'Fail', 'Partial', 'Cancelled', 'Waiting'];
+const STATUS_ORDER = ['Successful', 'Failed', 'Cost-to-Cost', 'UnPlanned', 'Cancelled', 'Waiting'];
 const TF_ORDER     = ['Monthly', 'Weekly', 'Daily', '4Hrs', '1Hrs'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -28,7 +29,6 @@ function pct(num, den) {
   return Math.round(((num || 0) / den) * 100);
 }
 
-// ── Shared small components ───────────────────────────────────────────────────
 function ChartQuestion({ text }) {
   return (
     <div className="flex items-start gap-2 mt-1 mb-4">
@@ -60,7 +60,6 @@ function Empty({ msg }) {
   );
 }
 
-// ── Custom tooltips ───────────────────────────────────────────────────────────
 function StatusTooltip({ active, payload }) {
   const { t } = useLanguage();
   if (!active || !payload?.length) return null;
@@ -75,12 +74,13 @@ function StatusTooltip({ active, payload }) {
 function TFTooltip({ active, payload, label }) {
   const { t } = useLanguage();
   if (!active || !payload?.length) return null;
+  const closedKeys = ['Successful', 'Failed', 'Cost-to-Cost'];
   const closed = payload
-    .filter((p) => ['Pass', 'Fail', 'Partial'].includes(p.dataKey))
+    .filter((p) => closedKeys.includes(p.dataKey))
     .reduce((s, p) => s + (p.value || 0), 0);
-  const passVal = payload.find((p) => p.dataKey === 'Pass')?.value || 0;
+  const successVal = payload.find((p) => p.dataKey === 'Successful')?.value || 0;
   return (
-    <div style={TT} className="text-xs space-y-1 min-w-[130px]">
+    <div style={TT} className="text-xs space-y-1 min-w-[140px]">
       <p className="font-semibold text-gray-200 mb-1.5">{label}</p>
       {payload.map((p) => p.value > 0 && (
         <div key={p.dataKey} className="flex items-center gap-2">
@@ -92,14 +92,13 @@ function TFTooltip({ active, payload, label }) {
       {closed > 0 && (
         <div className="border-t border-gray-700 pt-1 mt-1 flex justify-between">
           <span className="text-gray-500">{t('winRate')}:</span>
-          <span className="text-emerald-400 font-semibold">{pct(passVal, closed)}%</span>
+          <span className="text-emerald-400 font-semibold">{pct(successVal, closed)}%</span>
         </div>
       )}
     </div>
   );
 }
 
-// Win-rate label at end of each horizontal bar row
 function WinRateLabel({ x, y, width, height, value }) {
   if (!value) return null;
   return (
@@ -127,7 +126,7 @@ export default function SwingReport() {
   (data?.statusBreakdown || []).forEach((r) => { statusMap[r.status] = r.count; });
 
   const donutSlices = STATUS_ORDER
-    .map((s) => ({ name: t(s.toLowerCase()), value: statusMap[s] || 0, color: C[s.toLowerCase()], key: s }))
+    .map((s) => ({ name: s, value: statusMap[s] || 0, color: C[s], key: s }))
     .filter((s) => s.value > 0);
 
   const totalPlans = donutSlices.reduce((s, d) => s + d.value, 0);
@@ -137,21 +136,22 @@ export default function SwingReport() {
 
   const tfData = TF_ORDER.filter((tf) => tfMap[tf]).map((tf) => {
     const r = tfMap[tf];
-    const closed = (r.pass || 0) + (r.fail || 0) + (r.partial || 0);
+    const closed = (r.successful || 0) + (r.failed || 0) + (r.costToCost || 0);
     return {
-      timeframe: tf,
-      Pass:      r.pass      || 0,
-      Partial:   r.partial   || 0,
-      Fail:      r.fail      || 0,
-      Cancelled: r.cancelled || 0,
-      Waiting:   r.waiting   || 0,
-      winRate:   pct(r.pass || 0, closed),
+      timeframe:      tf,
+      Successful:     r.successful || 0,
+      'Cost-to-Cost': r.costToCost || 0,
+      Failed:         r.failed     || 0,
+      UnPlanned:      r.unplanned  || 0,
+      Cancelled:      r.cancelled  || 0,
+      Waiting:        r.waiting    || 0,
+      winRate:        pct(r.successful || 0, closed),
     };
   });
 
   const totals = data?.totals || {};
-  const closedTotal = (totals.pass || 0) + (totals.fail || 0) + (totals.partial || 0);
-  const overallWin  = pct(totals.pass || 0, closedTotal);
+  const closedTotal = (totals.successful || 0) + (totals.failed || 0) + (totals.costToCost || 0);
+  const overallWin  = pct(totals.successful || 0, closedTotal);
 
   if (loading) return <div className="flex items-center justify-center py-32 text-gray-500 text-sm">{t('loadingReport')}</div>;
   if (error)   return <div className="flex items-center justify-center py-32 text-red-400 text-sm">{error}</div>;
@@ -162,7 +162,7 @@ export default function SwingReport() {
       {/* ── Row 1: Donut + KPIs ── */}
       <div className="grid grid-cols-5 gap-5">
 
-        {/* Donut with CSS-overlay center label */}
+        {/* Donut */}
         <div className="col-span-2 glass-card p-5">
           <h4 className="text-sm font-semibold text-gray-200">{t('executionOverview')}</h4>
           <ChartQuestion text='"How are my swing trades resolving overall?"' />
@@ -179,7 +179,6 @@ export default function SwingReport() {
                     <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: '#9ca3af' }}>{v}</span>} />
                   </PieChart>
                 </ResponsiveContainer>
-                {/* Center label overlay */}
                 <div className="absolute top-0 left-0 right-0 flex justify-center" style={{ top: '20%', pointerEvents: 'none' }}>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-gray-100">{totalPlans}</div>
@@ -201,7 +200,7 @@ export default function SwingReport() {
           <KPICard
             label={t('overallWinRate')}
             value={`${overallWin}%`}
-            sub="Pass ÷ (Pass + Fail + Partial)"
+            sub="Successful ÷ (Successful + Failed + Cost-to-Cost)"
             color={overallWin >= 60 ? 'text-emerald-400' : overallWin >= 40 ? 'text-amber-400' : 'text-red-400'}
           />
           <KPICard
@@ -227,11 +226,12 @@ export default function SwingReport() {
                 <YAxis type="category" dataKey="timeframe" tick={{ fill: '#d1d5db', fontSize: 12 }} axisLine={false} tickLine={false} width={56} />
                 <Tooltip content={<TFTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                 <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} formatter={(v) => <span style={{ color: '#9ca3af' }}>{v}</span>} />
-                <Bar dataKey="Pass"      name={t('pass')}      stackId="s" fill={C.pass}      maxBarSize={22} radius={0} />
-                <Bar dataKey="Partial"   name={t('partial')}   stackId="s" fill={C.partial}   maxBarSize={22} radius={0} />
-                <Bar dataKey="Fail"      name={t('fail')}      stackId="s" fill={C.fail}      maxBarSize={22} radius={0} />
-                <Bar dataKey="Cancelled" name={t('cancelled')} stackId="s" fill={C.cancelled} maxBarSize={22} radius={0} />
-                <Bar dataKey="Waiting"   name={t('waiting')}   stackId="s" fill={C.waiting}   maxBarSize={22} radius={[0,4,4,0]}>
+                <Bar dataKey="Successful"     stackId="s" fill={C.Successful}      maxBarSize={22} radius={0} />
+                <Bar dataKey="Cost-to-Cost"   stackId="s" fill={C['Cost-to-Cost']} maxBarSize={22} radius={0} />
+                <Bar dataKey="Failed"         stackId="s" fill={C.Failed}          maxBarSize={22} radius={0} />
+                <Bar dataKey="UnPlanned"      stackId="s" fill={C.UnPlanned}       maxBarSize={22} radius={0} />
+                <Bar dataKey="Cancelled"      stackId="s" fill={C.Cancelled}       maxBarSize={22} radius={0} />
+                <Bar dataKey="Waiting"        stackId="s" fill={C.Waiting}         maxBarSize={22} radius={[0,4,4,0]}>
                   <LabelList dataKey="winRate" content={WinRateLabel} position="right" />
                 </Bar>
               </BarChart>

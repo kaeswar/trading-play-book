@@ -1,43 +1,71 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useStockPlan } from '../../hooks/useStockPlan';
+import { useSwingPlan } from '../../hooks/useSwingPlan';
+import { useApp } from '../../store/appStore';
 import { useLanguage } from '../../hooks/useLanguage';
-import { EXECUTION_STATUSES, TIMEFRAMES, STOCK_PLAN_BIAS_TAGS } from '../../../shared/constants';
-import { BIAS_KEY_MAP } from '../../../shared/i18n';
-import StockPlanCard from './StockPlanCard';
-import StockPlanDetail from './StockPlanDetail';
+import { TIMEFRAMES } from '../../../shared/constants';
+import SwingPlanCard from './SwingPlanCard';
+import SwingPlanDetail from './SwingPlanDetail';
+import SwingPlanInstanceForm from './SwingPlanInstanceForm';
+import PlanStorePicker from '../Phase1/PlanStorePicker';
 
-export default function StockPlanGallery() {
-  const { searchPlans, deletePlan } = useStockPlan();
+export default function SwingPlansView() {
+  const { search, deletePlan } = useSwingPlan();
+  const { showNotification } = useApp();
   const { t } = useLanguage();
 
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [timeframeFilter, setTimeframeFilter] = useState('');
-  const [biasFilter, setBiasFilter] = useState('');
   const [selectedPlanId, setSelectedPlanId] = useState(null);
+
+  // New-plan flow: pick template → fill instance form
+  const [pickerOpen, setPickerOpen]       = useState(false);
+  const [pickedTemplate, setPickedTemplate] = useState(null);
 
   const loadPlans = useCallback(async () => {
     setLoading(true);
-    const results = await searchPlans({
+    const results = await search({
       query: searchQuery,
-      executionStatus: statusFilter || undefined,
       timeframe: timeframeFilter || undefined,
-      biasTag: biasFilter || undefined,
+      activeOnly: true,
     });
     setPlans(results || []);
     setLoading(false);
-  }, [searchQuery, statusFilter, timeframeFilter, biasFilter]);
+  }, [searchQuery, timeframeFilter, search]);
 
   useEffect(() => { loadPlans(); }, [loadPlans]);
 
+  const handleDelete = async (id) => {
+    try {
+      await deletePlan(id);
+      showNotification('Plan deleted', 'info');
+      loadPlans();
+    } catch (err) {
+      showNotification('Failed to delete', 'error');
+    }
+  };
+
+  // Picker confirmed → fetch the picked template + open the instance form
+  const handlePickerConfirm = async (templateIds) => {
+    if (!templateIds || templateIds.length === 0) return;
+    const tpl = await window.api.planTemplate.get(templateIds[0]);
+    setPickerOpen(false);
+    setPickedTemplate(tpl);
+  };
+
+  const handleFormSaved = (swingPlan) => {
+    setPickedTemplate(null);
+    loadPlans();
+    if (swingPlan?.id) setSelectedPlanId(swingPlan.id);
+  };
+
+  // ── Detail view ──
   if (selectedPlanId) {
     return (
-      <StockPlanDetail
+      <SwingPlanDetail
         planId={selectedPlanId}
-        onBack={() => setSelectedPlanId(null)}
-        readOnly
+        onBack={() => { setSelectedPlanId(null); loadPlans(); }}
       />
     );
   }
@@ -61,17 +89,6 @@ export default function StockPlanGallery() {
           </div>
 
           <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="input-field text-sm w-auto"
-          >
-            <option value="">{t('allStatus')}</option>
-            {EXECUTION_STATUSES.map((s) => (
-              <option key={s} value={s}>{t(s.toLowerCase())}</option>
-            ))}
-          </select>
-
-          <select
             value={timeframeFilter}
             onChange={(e) => setTimeframeFilter(e.target.value)}
             className="input-field text-sm w-auto"
@@ -82,16 +99,15 @@ export default function StockPlanGallery() {
             ))}
           </select>
 
-          <select
-            value={biasFilter}
-            onChange={(e) => setBiasFilter(e.target.value)}
-            className="input-field text-sm w-auto"
+          <button
+            onClick={() => setPickerOpen(true)}
+            className="btn-primary text-sm px-4 py-2 flex items-center gap-1.5 flex-shrink-0"
           >
-            <option value="">{t('allBiases')}</option>
-            {STOCK_PLAN_BIAS_TAGS.map((b) => (
-              <option key={b} value={b}>{t(BIAS_KEY_MAP[b])}</option>
-            ))}
-          </select>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            {t('newSwingPlan') || 'New Swing Plan'}
+          </button>
         </div>
       </div>
 
@@ -109,24 +125,47 @@ export default function StockPlanGallery() {
             <line x1="18" y1="6" x2="18" y2="22" strokeLinecap="round" />
             <rect x="16" y="10" width="4" height="6" rx="0.5" fill="currentColor" stroke="none" />
           </svg>
-          <p className="text-gray-400 mb-1">No plans found</p>
-          <p className="text-sm text-gray-500">Try adjusting your search or filters</p>
+          <p className="text-gray-400 mb-1">No active swing plans</p>
+          <p className="text-sm text-gray-500">Pick a Swing template from the Plan Store to get started.</p>
+          <button onClick={() => setPickerOpen(true)} className="btn-primary text-sm px-5 py-2 mt-4">
+            {t('newSwingPlan') || 'New Swing Plan'}
+          </button>
         </div>
       ) : (
         <div className="space-y-2">
           {plans.map((plan) => (
-            <StockPlanCard
+            <SwingPlanCard
               key={plan.id}
               plan={plan}
               onClick={setSelectedPlanId}
-              onDelete={async (id) => { await deletePlan(id); loadPlans(); }}
+              onDelete={handleDelete}
             />
           ))}
         </div>
       )}
 
       {!loading && plans.length > 0 && (
-        <p className="text-xs text-gray-500 text-right">{plans.length} plan{plans.length !== 1 ? 's' : ''}</p>
+        <p className="text-xs text-gray-500 text-right">{plans.length} active plan{plans.length !== 1 ? 's' : ''}</p>
+      )}
+
+      {/* Template picker — single-pick, Swing tradeType */}
+      {pickerOpen && (
+        <PlanStorePicker
+          tradeType="Swing"
+          singlePick
+          confirmLabel="Next →"
+          onConfirm={handlePickerConfirm}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+
+      {/* Instance form — symbol/timeframe/entry/target/stop/analysis */}
+      {pickedTemplate && (
+        <SwingPlanInstanceForm
+          template={pickedTemplate}
+          onSaved={handleFormSaved}
+          onClose={() => setPickedTemplate(null)}
+        />
       )}
     </div>
   );

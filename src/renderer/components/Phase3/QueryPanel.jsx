@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../store/appStore';
 import { useLanguage } from '../../hooks/useLanguage';
-import { POSSIBILITIES, OUTCOMES, formatPossibilityCode } from '../../../shared/constants';
 
 export default function QueryPanel({ filters, onFilterChange }) {
   const { symbols } = useApp();
@@ -72,22 +71,7 @@ export default function QueryPanel({ filters, onFilterChange }) {
               />
             </div>
 
-            {/* Possibility */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase">{t('filterDefaultPlan')}</label>
-              <select
-                value={filters.possibilityCode || ''}
-                onChange={(e) => updateFilter('possibilityCode', e.target.value)}
-                className="input-field text-sm"
-              >
-                <option value="">{t('filterAll')}</option>
-                {POSSIBILITIES.map((p) => (
-                  <option key={p.code} value={p.code}>{formatPossibilityCode(p.code)}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Outcome / Verdict */}
+            {/* Plan execution status */}
             <div>
               <label className="block text-xs text-gray-500 mb-1 uppercase">{t('filterOutcome')}</label>
               <select
@@ -96,16 +80,11 @@ export default function QueryPanel({ filters, onFilterChange }) {
                 className="input-field text-sm"
               >
                 <option value="">{t('filterAll')}</option>
-                <optgroup label={t('filterDefaultPlan')}>
-                  <option value="Accepted">Accepted</option>
-                  <option value="Rejected">Rejected</option>
-                </optgroup>
-                <optgroup label="Custom Plan">
-                  <option value="Pass">{t('pass')}</option>
-                  <option value="Fail">{t('fail')}</option>
-                  <option value="Partial">{t('partial')}</option>
-                  <option value="Cancelled">{t('cancelled')}</option>
-                </optgroup>
+                <option value="Successful">Successful</option>
+                <option value="Failed">Failed</option>
+                <option value="Cost-to-Cost">Cost-to-Cost</option>
+                <option value="Cancelled">{t('cancelled')}</option>
+                <option value="Waiting">{t('waiting')}</option>
               </select>
             </div>
 
@@ -126,25 +105,6 @@ export default function QueryPanel({ filters, onFilterChange }) {
               </select>
             </div>
 
-            {/* Prepared */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase">{t('filterPreparation')}</label>
-              <select
-                value={filters.prepared === undefined ? '' : filters.prepared ? 'yes' : 'no'}
-                onChange={(e) => {
-                  if (e.target.value === '') {
-                    updateFilter('prepared', null);
-                  } else {
-                    updateFilter('prepared', e.target.value === 'yes');
-                  }
-                }}
-                className="input-field text-sm"
-              >
-                <option value="">{t('filterAll')}</option>
-                <option value="yes">{t('filterPrepared')}</option>
-                <option value="no">{t('filterUnprepared')}</option>
-              </select>
-            </div>
           </div>
 
           {activeFilterCount > 0 && (

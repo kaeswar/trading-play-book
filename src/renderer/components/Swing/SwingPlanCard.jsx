@@ -1,26 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { EXECUTION_STATUS_COLORS, TIMEFRAME_COLORS, STOCK_PLAN_BIAS_COLORS } from '../../../shared/constants';
+import {
+  TIMEFRAME_COLORS, STOCK_PLAN_BIAS_COLORS, BEHAVIOR_TAGS, DAY_PLAN_STATUS_COLORS,
+  deriveBehaviorTag, formatDate,
+} from '../../../shared/constants';
 import { useLanguage } from '../../hooks/useLanguage';
 
-export default function StockPlanCard({ plan, onClick, onDelete }) {
+export default function SwingPlanCard({ plan, onClick, onDelete }) {
   const { t } = useLanguage();
-  const [chartSrc, setChartSrc] = useState(null);
+  const [setupShot, setSetupShot] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Load first setup screenshot as the card thumbnail (if any)
   useEffect(() => {
-    if (plan.chart_path) {
-      window.api.image.getFullPath(plan.chart_path).then(async (fullPath) => {
-        if (fullPath) {
-          const dataUrl = await window.api.image.toDataUrl(fullPath);
-          if (dataUrl) setChartSrc(dataUrl);
-        }
-      });
-    }
-  }, [plan.chart_path]);
+    (async () => {
+      const shots = await window.api.swingPlanScreenshot.getBySwingPlan(plan.id, 'setup');
+      if (!shots || shots.length === 0) return;
+      const fullPath = await window.api.image.getFullPath(shots[0].file_path);
+      if (fullPath) {
+        const dataUrl = await window.api.image.toDataUrl(fullPath);
+        if (dataUrl) setSetupShot(dataUrl);
+      }
+    })();
+  }, [plan.id]);
 
-  const statusColor = plan.execution_status ? EXECUTION_STATUS_COLORS[plan.execution_status] : null;
-  const tfColor = TIMEFRAME_COLORS[plan.timeframe] || { bg: 'bg-surface-600', text: 'text-gray-400', border: 'border-surface-500' };
-  const biasColor = plan.bias_tag ? STOCK_PLAN_BIAS_COLORS[plan.bias_tag] : null;
+  const biasColors  = STOCK_PLAN_BIAS_COLORS[plan.bias];
+  const tag         = deriveBehaviorTag(plan.bias, plan.behavior_tag);
+  const tagColors   = tag && tag !== plan.bias ? BEHAVIOR_TAGS[tag] : null;
+  const tfColors    = TIMEFRAME_COLORS[plan.timeframe] || { bg: 'bg-surface-600', text: 'text-gray-400', border: 'border-surface-500' };
+  const execColors  = plan.execution_status && plan.execution_status !== 'Waiting'
+    ? DAY_PLAN_STATUS_COLORS[plan.execution_status]
+    : null;
 
   const handleDelete = (e) => {
     e.stopPropagation();
@@ -42,26 +51,33 @@ export default function StockPlanCard({ plan, onClick, onDelete }) {
     >
       <div className="flex items-start gap-4">
         {/* Chart thumbnail */}
-        {chartSrc && (
+        {setupShot && (
           <div className="w-16 h-16 rounded-lg overflow-hidden border border-surface-500/60 flex-shrink-0">
-            <img src={chartSrc} alt={plan.stock_name} className="w-full h-full object-cover" onError={() => setChartSrc(null)} />
+            <img src={setupShot} alt={plan.symbol_name} className="w-full h-full object-cover" onError={() => setSetupShot(null)} />
           </div>
         )}
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-base font-semibold text-gray-200">{plan.stock_name}</h3>
-            <span className={`badge text-[10px] ${tfColor.bg} ${tfColor.text} border ${tfColor.border}`}>
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="text-base font-semibold text-gray-200">{plan.symbol_name}</span>
+            <span className="text-xs text-gray-500">·</span>
+            <span className="text-sm text-gray-300 truncate">{plan.name}</span>
+            <span className={`badge text-[10px] ${tfColors.bg} ${tfColors.text} border ${tfColors.border}`}>
               {plan.timeframe}
             </span>
-            {biasColor && (
-              <span className={`badge text-[10px] ${biasColor.bg} ${biasColor.text} border ${biasColor.border}`}>
-                {plan.bias_tag}
+            {biasColors && (
+              <span className={`badge text-[10px] ${biasColors.bg} ${biasColors.text} border ${biasColors.border}`}>
+                {plan.bias}
               </span>
             )}
-            {statusColor && (
-              <span className={`badge text-[10px] ${statusColor.bg} ${statusColor.text} border ${statusColor.border}`}>
+            {tagColors && (
+              <span className={`badge text-[10px] ${tagColors.bg} ${tagColors.text} border ${tagColors.border}`}>
+                {tag}
+              </span>
+            )}
+            {execColors && (
+              <span className={`badge text-[10px] ${execColors.bg} ${execColors.text} border ${execColors.border}`}>
                 {plan.execution_status}
               </span>
             )}
@@ -69,27 +85,23 @@ export default function StockPlanCard({ plan, onClick, onDelete }) {
 
           {/* Price levels */}
           <div className="flex items-center gap-3 text-xs text-gray-400">
-            {plan.entry_price && (
+            {plan.entry_price != null && (
               <span>{t('entryPrice')}: <span className="text-gray-300">{plan.entry_price}</span></span>
             )}
-            {plan.target_price && (
+            {plan.target_price != null && (
               <span>{t('target')}: <span className="text-emerald-400">{plan.target_price}</span></span>
             )}
-            {plan.stop_loss && (
+            {plan.stop_loss != null && (
               <span>{t('stopLoss')}: <span className="text-red-400">{plan.stop_loss}</span></span>
             )}
           </div>
 
-          {/* Analysis preview */}
+          {/* Analysis preview + plan date */}
           {plan.analysis && (
             <p className="text-xs text-gray-500 mt-1 truncate">{plan.analysis}</p>
           )}
-
-          {/* Plan date */}
           {plan.plan_date && (
-            <p className="text-[10px] text-gray-600 mt-1">
-              {new Date(plan.plan_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-            </p>
+            <p className="text-[10px] text-gray-600 mt-1">{formatDate(plan.plan_date)}</p>
           )}
         </div>
 

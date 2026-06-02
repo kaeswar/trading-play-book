@@ -4,8 +4,8 @@ import { useLanguage } from './hooks/useLanguage';
 import PlanningView from './components/Phase1/PlanningView';
 import VerdictView from './components/Phase2/VerdictView';
 import GalleryView from './components/Phase3/GalleryView';
-import StockPlansView from './components/StockPlans/StockPlansView';
-import StockPlanGallery from './components/StockPlans/StockPlanGallery';
+import SwingPlansView from './components/Swing/SwingPlansView';
+import SwingGallery from './components/Swing/SwingGallery';
 import SettingsView from './components/Settings/SettingsView';
 import IntradayReport from './components/Reports/IntradayReport';
 import SwingReport from './components/Reports/SwingReport';
@@ -14,6 +14,11 @@ import UserGuideModal from './components/shared/UserGuideModal';
 import StyledDatePicker from './components/shared/StyledDatePicker';
 
 const SETTINGS_TREE = [
+  {
+    id: 'planTemplates',
+    label: 'Plan Templates',
+    icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+  },
   {
     id: 'symbols',
     label: 'Symbols',
@@ -54,7 +59,7 @@ const REPORTS_NAV = [
 
 const PAGE_META = {
   planning:       { title: 'Pre-Market Planning',    sub: 'Document your trading expectations before market opens' },
-  verdict:        { title: 'Post-Market Verdict',     sub: 'Record what actually happened after market close' },
+  verdict:        { title: "Update Plan's Verdict",     sub: "Record each plan's outcome after market close" },
   gallery:        { title: 'Gallery & Analysis',      sub: 'Review past trading days and analyse patterns' },
   swingPlans:     { title: 'Swing Plans',             sub: 'Active and open swing trade setups' },
   swingGallery:   { title: 'Swing Gallery',           sub: 'Search and review all swing trade plans' },
@@ -112,7 +117,7 @@ function AppContent() {
     window.api.on('menu:open-guide', () => setShowGuide(true));
   }, []);
   const [availableDates, setAvailableDates] = useState([]);
-  const [settingsSelected, setSettingsSelected] = useState('dayPlan');
+  const [settingsSelected, setSettingsSelected] = useState('planTemplates');
 
   useEffect(() => { loadSymbols(); }, []);
 
@@ -219,32 +224,6 @@ function AppContent() {
 
         {/* Footer */}
         <div className="p-4 border-t border-surface-600/50 space-y-2">
-          {/* Language toggle */}
-          <div className="flex items-center justify-between px-1">
-            <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">{t('language')}</span>
-            <div className="flex rounded-md overflow-hidden border border-surface-600/50">
-              <button
-                onClick={() => setLanguage('en')}
-                className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                  language === 'en'
-                    ? 'bg-primary-600/30 text-primary-300'
-                    : 'text-gray-500 hover:text-gray-300 hover:bg-surface-700'
-                }`}
-              >
-                EN
-              </button>
-              <button
-                onClick={() => setLanguage('ta')}
-                className={`px-2.5 py-1 text-[11px] font-medium transition-colors border-l border-surface-600/50 ${
-                  language === 'ta'
-                    ? 'bg-primary-600/30 text-primary-300'
-                    : 'text-gray-500 hover:text-gray-300 hover:bg-surface-700'
-                }`}
-              >
-                தமிழ்
-              </button>
-            </div>
-          </div>
           <button
             onClick={() => setShowAbout(true)}
             className="w-full text-xs text-gray-500 hover:text-primary-400 transition-colors py-1"
@@ -332,22 +311,25 @@ function AppContent() {
           {currentView === 'planning'       && <PlanningView />}
           {currentView === 'verdict'        && <VerdictView />}
           {currentView === 'gallery'        && <GalleryView />}
-          {currentView === 'swingPlans'     && <StockPlansView />}
-          {currentView === 'swingGallery'   && <StockPlanGallery />}
+          {currentView === 'swingPlans'     && <SwingPlansView />}
+          {currentView === 'swingGallery'   && <SwingGallery />}
           {isSettings                       && <SettingsView selected={settingsSelected} />}
           {currentView === 'reportIntraday' && <IntradayReport />}
           {currentView === 'reportSwing'    && <SwingReport />}
         </div>
       </main>
 
-      {/* Notification */}
+      {/* Notification — top-right quiet toast */}
       {notification && (
-        <div className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 px-6 py-3 rounded-lg shadow-lg border animate-slide-up ${
-          notification.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' :
-          notification.type === 'error'   ? 'bg-red-500/20 border-red-500/30 text-red-400' :
-                                            'bg-primary-500/20 border-primary-500/30 text-primary-400'
-        }`}>
-          <p className="text-sm font-medium">{notification.message}</p>
+        <div
+          key={notification.id || notification.message}
+          className={`fixed top-4 right-4 z-50 px-3.5 py-2 rounded-md shadow-md border text-xs animate-slide-in-right max-w-sm ${
+            notification.type === 'success' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' :
+            notification.type === 'error'   ? 'bg-red-500/15 border-red-500/30 text-red-300' :
+                                              'bg-primary-500/15 border-primary-500/30 text-primary-300'
+          }`}
+        >
+          <p className="font-medium leading-snug">{notification.message}</p>
         </div>
       )}
 

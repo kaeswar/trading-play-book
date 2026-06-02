@@ -3,22 +3,25 @@ import DayPlanManagement from './DayPlanManagement';
 import ExportView from './ExportView';
 import SymbolsView from './SymbolsView';
 import BackupView from './BackupView';
+import PlanTemplatesView from './PlanTemplatesView';
 
 const COMPONENTS = {
-  dayPlan: DayPlanManagement,
-  export:  ExportView,
-  symbols: SymbolsView,
-  backup:  BackupView,
+  planTemplates: PlanTemplatesView,
+  dayPlan:       DayPlanManagement,
+  export:        ExportView,
+  symbols:       SymbolsView,
+  backup:        BackupView,
 };
 
 const LABELS = {
-  dayPlan: 'Plan - Day Change',
-  export:  'Export',
-  symbols: 'Symbols',
-  backup:  'Backup / Restore',
+  planTemplates: 'Plan Templates',
+  dayPlan:       'Plan - Day Change',
+  export:        'Export',
+  symbols:       'Symbols',
+  backup:        'Backup / Restore',
 };
 
-const NO_HEADING = new Set(['export', 'backup']);
+const NO_HEADING = new Set(['export', 'backup', 'planTemplates']);
 
 export default function SettingsView({ selected }) {
   const Component = COMPONENTS[selected];

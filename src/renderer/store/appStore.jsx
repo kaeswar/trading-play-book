@@ -31,8 +31,11 @@ export function AppProvider({ children }) {
   });
 
   const showNotification = useCallback((message, type = 'info') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 4000);
+    const id = Date.now() + Math.random();
+    setNotification({ id, message, type });
+    setTimeout(() => {
+      setNotification((current) => (current && current.id === id ? null : current));
+    }, 2000);
   }, []);
 
   const loadSymbols = useCallback(async () => {

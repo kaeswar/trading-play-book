@@ -16,52 +16,11 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('tradingDay:getByDateAndSymbol', date, symbolId),
     getAll: () => ipcRenderer.invoke('tradingDay:getAll'),
     create: (data) => ipcRenderer.invoke('tradingDay:create', data),
+    createWithPlans: (data) => ipcRenderer.invoke('tradingDay:createWithPlans', data),
     updateNotes: (id, notes) => ipcRenderer.invoke('tradingDay:updateNotes', id, notes),
     updateDate: (id, newDate) => ipcRenderer.invoke('tradingDay:updateDate', id, newDate),
     delete: (id) => ipcRenderer.invoke('tradingDay:delete', id),
     getAvailableDates: (symbolId) => ipcRenderer.invoke('tradingDay:getAvailableDates', symbolId),
-  },
-
-  // Possibility
-  possibility: {
-    getByTradingDay: (tradingDayId) =>
-      ipcRenderer.invoke('possibility:getByTradingDay', tradingDayId),
-    create: (data) => ipcRenderer.invoke('possibility:create', data),
-    updateHasPlan: (id, hasPlan) =>
-      ipcRenderer.invoke('possibility:updateHasPlan', id, hasPlan),
-  },
-
-  // Outcome Plan
-  outcomePlan: {
-    getByPossibility: (possibilityId) =>
-      ipcRenderer.invoke('outcomePlan:getByPossibility', possibilityId),
-    create: (data) => ipcRenderer.invoke('outcomePlan:create', data),
-    update: (id, data) => ipcRenderer.invoke('outcomePlan:update', id, data),
-    delete: (id) => ipcRenderer.invoke('outcomePlan:delete', id),
-  },
-
-  // Screenshot
-  screenshot: {
-    getByOutcomePlan: (outcomePlanId) =>
-      ipcRenderer.invoke('screenshot:getByOutcomePlan', outcomePlanId),
-    create: (data) => ipcRenderer.invoke('screenshot:create', data),
-    delete: (id) => ipcRenderer.invoke('screenshot:delete', id),
-  },
-
-  // Verdict
-  verdict: {
-    getByTradingDay: (tradingDayId) =>
-      ipcRenderer.invoke('verdict:getByTradingDay', tradingDayId),
-    create: (data) => ipcRenderer.invoke('verdict:create', data),
-    update: (id, data) => ipcRenderer.invoke('verdict:update', id, data),
-  },
-
-  // Verdict Screenshot
-  verdictScreenshot: {
-    getByVerdict: (verdictId) =>
-      ipcRenderer.invoke('verdictScreenshot:getByVerdict', verdictId),
-    create: (data) => ipcRenderer.invoke('verdictScreenshot:create', data),
-    delete: (id) => ipcRenderer.invoke('verdictScreenshot:delete', id),
   },
 
   // Image
@@ -91,39 +50,14 @@ contextBridge.exposeInMainWorld('api', {
     getMetrics: (symbolId) => ipcRenderer.invoke('query:getMetrics', symbolId),
   },
 
-  // Custom Plan
-  customPlan: {
-    getByTradingDay: (tradingDayId) =>
-      ipcRenderer.invoke('customPlan:getByTradingDay', tradingDayId),
-    getById: (id) => ipcRenderer.invoke('customPlan:getById', id),
-    create: (data) => ipcRenderer.invoke('customPlan:create', data),
-    update: (id, data) => ipcRenderer.invoke('customPlan:update', id, data),
-    updateVerdict: (id, data) => ipcRenderer.invoke('customPlan:updateVerdict', id, data),
-    delete: (id) => ipcRenderer.invoke('customPlan:delete', id),
-  },
-
-  // Custom Plan Screenshot
-  customPlanScreenshot: {
-    getByCustomPlan: (customPlanId) =>
-      ipcRenderer.invoke('customPlanScreenshot:getByCustomPlan', customPlanId),
-    create: (data) => ipcRenderer.invoke('customPlanScreenshot:create', data),
-    delete: (id) => ipcRenderer.invoke('customPlanScreenshot:delete', id),
-  },
-
-  // Intraday Note
+  // Intraday Note (per day_plan)
   intradayNote: {
-    getByOutcomePlan: (outcomePlanId) =>
-      ipcRenderer.invoke('intradayNote:getByOutcomePlan', outcomePlanId),
-    getByCustomPlan: (customPlanId) =>
-      ipcRenderer.invoke('intradayNote:getByCustomPlan', customPlanId),
-    getByTradingDay: (tradingDayId) =>
-      ipcRenderer.invoke('intradayNote:getByTradingDay', tradingDayId),
-    countByTradingDay: (tradingDayId) =>
-      ipcRenderer.invoke('intradayNote:countByTradingDay', tradingDayId),
-    create: (data) => ipcRenderer.invoke('intradayNote:create', data),
-    update: (id, data) => ipcRenderer.invoke('intradayNote:update', id, data),
-    updateAttachment: (id, data) => ipcRenderer.invoke('intradayNote:updateAttachment', id, data),
-    delete: (id) => ipcRenderer.invoke('intradayNote:delete', id),
+    getByDayPlan:      (dayPlanId)    => ipcRenderer.invoke('intradayNote:getByDayPlan', dayPlanId),
+    getByTradingDay:   (tradingDayId) => ipcRenderer.invoke('intradayNote:getByTradingDay', tradingDayId),
+    countByTradingDay: (tradingDayId) => ipcRenderer.invoke('intradayNote:countByTradingDay', tradingDayId),
+    create:            (data)         => ipcRenderer.invoke('intradayNote:create', data),
+    update:            (id, data)     => ipcRenderer.invoke('intradayNote:update', id, data),
+    delete:            (id)           => ipcRenderer.invoke('intradayNote:delete', id),
   },
 
   // Intraday Note Screenshot
@@ -138,8 +72,9 @@ contextBridge.exposeInMainWorld('api', {
   export: {
     toCSV: (params) => ipcRenderer.invoke('export:toCSV', params),
     toPDF: (params) => ipcRenderer.invoke('export:toPDF', params),
-    swingToCSV: (params) => ipcRenderer.invoke('export:swingToCSV', params),
-    swingToPDF: (params) => ipcRenderer.invoke('export:swingToPDF', params),
+    swingToCSV:    (params) => ipcRenderer.invoke('export:swingToCSV', params),
+    swingToPDF:    (params) => ipcRenderer.invoke('export:swingToPDF', params),
+    planWiseToCSV: (params) => ipcRenderer.invoke('export:planWiseToCSV', params),
   },
 
   // Backup / Restore
@@ -154,17 +89,60 @@ contextBridge.exposeInMainWorld('api', {
     swing:    ()         => ipcRenderer.invoke('report:swing'),
   },
 
-  // Stock Plan
-  stockPlan: {
-    getAll: () => ipcRenderer.invoke('stockPlan:getAll'),
-    getById: (id) => ipcRenderer.invoke('stockPlan:getById', id),
-    create: (data) => ipcRenderer.invoke('stockPlan:create', data),
-    update: (id, data) => ipcRenderer.invoke('stockPlan:update', id, data),
-    updateExecutionStatus: (id, status) =>
-      ipcRenderer.invoke('stockPlan:updateExecutionStatus', id, status),
-    delete: (id) => ipcRenderer.invoke('stockPlan:delete', id),
-    search: (filters) => ipcRenderer.invoke('stockPlan:search', filters),
-    getDistinctStockNames: () => ipcRenderer.invoke('stockPlan:getDistinctStockNames'),
+  // Swing Plan (template-instance pattern)
+  swingPlan: {
+    search:             (filters)    => ipcRenderer.invoke('swingPlan:search', filters || {}),
+    get:                (id)         => ipcRenderer.invoke('swingPlan:get', id),
+    createFromTemplate: (data)       => ipcRenderer.invoke('swingPlan:createFromTemplate', data),
+    updateNumbers:      (id, data)   => ipcRenderer.invoke('swingPlan:updateNumbers', id, data),
+    updateExecution:    (id, data)   => ipcRenderer.invoke('swingPlan:updateExecution', id, data),
+    delete:             (id)         => ipcRenderer.invoke('swingPlan:delete', id),
+    getDistinctSymbols:            ()           => ipcRenderer.invoke('swingPlan:getDistinctSymbols'),
+    getDistinctSymbolsByTemplate:  (templateId) => ipcRenderer.invoke('swingPlan:getDistinctSymbolsByTemplate', templateId),
+    getDistinctTemplates:          ()           => ipcRenderer.invoke('swingPlan:getDistinctTemplates'),
+  },
+
+  swingPlanScreenshot: {
+    getBySwingPlan: (swingPlanId, kind) =>
+      ipcRenderer.invoke('swingPlanScreenshot:getBySwingPlan', swingPlanId, kind || null),
+    create: (data) => ipcRenderer.invoke('swingPlanScreenshot:create', data),
+    delete: (id)   => ipcRenderer.invoke('swingPlanScreenshot:delete', id),
+  },
+
+  // Plan Group (template library)
+  planGroup: {
+    list:   ()         => ipcRenderer.invoke('planGroup:list'),
+    create: (data)     => ipcRenderer.invoke('planGroup:create', data),
+    update: (id, data) => ipcRenderer.invoke('planGroup:update', id, data),
+    delete: (id)       => ipcRenderer.invoke('planGroup:delete', id),
+  },
+
+  // Plan Template (template library)
+  planTemplate: {
+    list:    (filters)        => ipcRenderer.invoke('planTemplate:list', filters || {}),
+    get:     (id)             => ipcRenderer.invoke('planTemplate:get', id),
+    create:  (data)           => ipcRenderer.invoke('planTemplate:create', data),
+    update:  (id, data)       => ipcRenderer.invoke('planTemplate:update', id, data),
+    archive: (id, archived)   => ipcRenderer.invoke('planTemplate:archive', id, !!archived),
+    delete:  (id)             => ipcRenderer.invoke('planTemplate:delete', id),
+    clone:   (id, name)       => ipcRenderer.invoke('planTemplate:clone', id, name || null),
+  },
+
+  // Day Plan (instance picked for a day from a template)
+  dayPlan: {
+    getByTradingDay:    (tradingDayId) => ipcRenderer.invoke('dayPlan:getByTradingDay', tradingDayId),
+    get:                (id)           => ipcRenderer.invoke('dayPlan:get', id),
+    createFromTemplate: (data)         => ipcRenderer.invoke('dayPlan:createFromTemplate', data),
+    updateNumbers:      (id, data)     => ipcRenderer.invoke('dayPlan:updateNumbers', id, data),
+    updateExecution:    (id, data)     => ipcRenderer.invoke('dayPlan:updateExecution', id, data),
+    updateSortOrder:    (id, n)        => ipcRenderer.invoke('dayPlan:updateSortOrder', id, n),
+    delete:             (id)           => ipcRenderer.invoke('dayPlan:delete', id),
+  },
+
+  dayPlanScreenshot: {
+    getByDayPlan: (dayPlanId, kind) => ipcRenderer.invoke('dayPlanScreenshot:getByDayPlan', dayPlanId, kind || null),
+    create:       (data)            => ipcRenderer.invoke('dayPlanScreenshot:create', data),
+    delete:       (id)              => ipcRenderer.invoke('dayPlanScreenshot:delete', id),
   },
 
   // Main → Renderer events (menu actions)

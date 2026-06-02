@@ -13,13 +13,15 @@ const AXIS  = '#6b7280';
 const TT    = { backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '8px', padding: '8px 12px' };
 
 const C = {
-  total:     '#374151',
-  planned:   '#6366f1',
-  planRate:  '#a78bfa',
-  accepted:  '#10b981',
-  rejected:  '#ef4444',
-  noPlan:    '#f59e0b',
-  noVerdict: '#4b5563',
+  total:      '#374151',
+  planned:    '#6366f1',
+  planRate:   '#a78bfa',
+  successful: '#10b981',
+  failed:     '#ef4444',
+  costToCost: '#f59e0b',
+  unplanned:  '#8b5cf6',
+  cancelled:  '#6b7280',
+  waiting:    '#fbbf24',
 };
 
 // ── Tiny helpers ──────────────────────────────────────────────────────────────
@@ -126,19 +128,22 @@ export default function IntradayReport() {
   const monthly = (data?.monthly || []).map((r) => ({
     ...r,
     label:    fmtMonth(r.month),
-    planRate: pct(r.plannedDays, r.verdictDays),
+    planRate: pct(r.plannedDays, r.totalDays),
   }));
 
   const bd = data?.breakdown || {};
   const totalDays   = bd.totalDays  || 0;
-  const prepRate    = pct(bd.plannedDays,  bd.verdictDays);
-  const successRate = pct(bd.accepted, (bd.accepted || 0) + (bd.rejected || 0));
+  const prepRate    = pct(bd.plannedDays, bd.totalDays);
+  const closedPlans = (bd.successful || 0) + (bd.failed || 0) + (bd.costToCost || 0);
+  const successRate = pct(bd.successful, closedPlans);
 
   const donutSlices = [
-    { name: t('accepted'),  value: bd.accepted  || 0, color: C.accepted  },
-    { name: t('rejected'),  value: bd.rejected  || 0, color: C.rejected  },
-    { name: t('noPlan'),    value: bd.noPlan    || 0, color: C.noPlan    },
-    { name: t('noVerdict'), value: bd.noVerdict || 0, color: C.noVerdict },
+    { name: 'Successful',   value: bd.successful || 0, color: C.successful },
+    { name: 'Failed',       value: bd.failed     || 0, color: C.failed     },
+    { name: 'Cost-to-Cost', value: bd.costToCost || 0, color: C.costToCost },
+    { name: 'UnPlanned',    value: bd.unplanned  || 0, color: C.unplanned  },
+    { name: t('cancelled'), value: bd.cancelled  || 0, color: C.cancelled  },
+    { name: t('waiting'),   value: bd.waiting    || 0, color: C.waiting    },
   ].filter((s) => s.value > 0);
 
   const xInterval = monthly.length > 12 ? Math.floor(monthly.length / 10) : 0;
@@ -232,9 +237,9 @@ export default function IntradayReport() {
             color={prepRate >= 70 ? 'text-emerald-400' : prepRate >= 40 ? 'text-amber-400' : 'text-red-400'}
           />
           <KPICard
-            label={t('planSuccessRate')}
+            label={t('passRate')}
             value={`${successRate}%`}
-            sub="of planned days the market accepted the scenario"
+            sub={`${bd.successful || 0} successful / ${closedPlans} closed plans`}
             color={successRate >= 60 ? 'text-emerald-400' : successRate >= 40 ? 'text-amber-400' : 'text-red-400'}
           />
         </div>

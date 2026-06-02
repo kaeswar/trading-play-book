@@ -2,7 +2,7 @@ import React from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
-export default function StyledDatePicker({ value, onChange, highlightDates = [], placeholderText }) {
+export default function StyledDatePicker({ value, onChange, highlightDates = [], placeholderText, disabled }) {
   // Convert date string "YYYY-MM-DD" to Date object
   const selectedDate = value ? new Date(value + 'T00:00:00') : null;
 
@@ -31,6 +31,7 @@ export default function StyledDatePicker({ value, onChange, highlightDates = [],
         popperClassName="dark-datepicker-popper"
         showPopperArrow={false}
         portalId="datepicker-portal"
+        disabled={disabled}
       />
     </div>
   );

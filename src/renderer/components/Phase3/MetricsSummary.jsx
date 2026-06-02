@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { POSSIBILITIES, formatPossibilityCode } from '../../../shared/constants';
 
 export default function MetricsSummary({ symbolId }) {
   const [metrics, setMetrics] = useState(null);
@@ -36,16 +35,16 @@ export default function MetricsSummary({ symbolId }) {
     );
   }
 
-  const mostPlannedLabel = metrics.mostPlannedPossibility?.code
-    ? formatPossibilityCode(metrics.mostPlannedPossibility.code)
-    : 'N/A';
-  const mostOccurredLabel = metrics.mostOccurredPossibility?.code
-    ? formatPossibilityCode(metrics.mostOccurredPossibility.code)
-    : 'N/A';
+  const preparationRate = metrics.totalDays > 0
+    ? Math.round((metrics.preparedDays / metrics.totalDays) * 100)
+    : 0;
+  const closedPlans = (metrics.successfulPlans || 0) + (metrics.failedPlans || 0) + (metrics.costToCostPlans || 0);
+  const passRate = closedPlans > 0
+    ? Math.round((metrics.successfulPlans / closedPlans) * 100)
+    : 0;
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           title="Total Days"
@@ -59,7 +58,7 @@ export default function MetricsSummary({ symbolId }) {
         />
         <MetricCard
           title="Preparation Rate"
-          value={`${metrics.preparationRate}%`}
+          value={`${preparationRate}%`}
           subtitle={`${metrics.preparedDays} of ${metrics.totalDays} days`}
           icon={
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -69,113 +68,54 @@ export default function MetricsSummary({ symbolId }) {
           color="emerald"
         />
         <MetricCard
-          title="Plan Match Rate"
-          value={`${metrics.planMatchRate}%`}
-          subtitle="Plans matching verdicts"
+          title="Total Plans"
+          value={metrics.totalPlans}
+          subtitle={`${closedPlans} closed`}
           icon={
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
           }
           color="blue"
         />
         <MetricCard
-          title="Total Days"
-          value={metrics.totalDays}
+          title="Pass Rate"
+          value={`${passRate}%`}
+          subtitle={`${metrics.successfulPlans} successful · ${metrics.failedPlans} failed`}
           icon={
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
           }
           color="purple"
         />
       </div>
 
-      {/* Detailed Metrics */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Possibility Insights */}
-        <div className="glass-card p-5">
-          <h4 className="section-title mb-4">Default Plan Insights</h4>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-surface-700/50 rounded-lg">
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Most Planned</p>
-                <p className="text-sm font-medium text-gray-200">{mostPlannedLabel}</p>
-              </div>
-              <span className="badge bg-primary-500/20 text-primary-400 text-xs">
-                {metrics.mostPlannedPossibility?.count || 0} times
-              </span>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-surface-700/50 rounded-lg">
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Most Occurred</p>
-                <p className="text-sm font-medium text-gray-200">{mostOccurredLabel}</p>
-              </div>
-              <span className="badge bg-emerald-500/20 text-emerald-400 text-xs">
-                {metrics.mostOccurredPossibility?.count || 0} times
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Outcome Distribution */}
-        <div className="glass-card p-5">
-          <h4 className="section-title mb-4">Outcome Distribution</h4>
-          <div className="space-y-3">
-            {metrics.outcomeDistribution?.map((item) => {
-              const total = metrics.totalDays || 1;
-              const pct = Math.round((item.count / total) * 100);
-              const colors = {
-                Accepted: 'bg-emerald-500',
-                Rejected: 'bg-red-500',
-              };
-
-              return (
-                <div key={item.outcome}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-gray-300">{item.outcome}</span>
-                    <span className="text-xs text-gray-500">{item.count} ({pct}%)</span>
-                  </div>
-                  <div className="h-2 bg-surface-600 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${colors[item.outcome] || 'bg-gray-500'}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
+      <div className="glass-card p-5">
+        <h4 className="section-title mb-4">Plan Status Breakdown</h4>
+        <div className="space-y-3">
+          {[
+            { label: 'Successful',   count: metrics.successfulPlans,  color: 'bg-emerald-500' },
+            { label: 'Failed',       count: metrics.failedPlans,      color: 'bg-red-500' },
+            { label: 'Cost-to-Cost', count: metrics.costToCostPlans,  color: 'bg-amber-500' },
+            { label: 'UnPlanned',    count: metrics.unplannedPlans,   color: 'bg-violet-500' },
+            { label: 'Cancelled',    count: metrics.cancelledPlans,   color: 'bg-gray-500' },
+            { label: 'Waiting',      count: metrics.waitingPlans,     color: 'bg-amber-400' },
+          ].map(row => {
+            const total = metrics.totalPlans || 1;
+            const pct = Math.round((row.count / total) * 100);
+            return (
+              <div key={row.label}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-gray-300">{row.label}</span>
+                  <span className="text-xs text-gray-500">{row.count} ({pct}%)</span>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Bias Distribution */}
-        <div className="glass-card p-5">
-          <h4 className="section-title mb-4">Bias Distribution</h4>
-          <div className="space-y-3">
-            {metrics.biasDistribution?.map((item) => {
-              const total = metrics.totalDays || 1;
-              const pct = Math.round((item.count / total) * 100);
-              const colors = {
-                Bullish: 'bg-blue-500',
-                Bearish: 'bg-red-500',
-              };
-
-              return (
-                <div key={item.bias}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-gray-300">{item.bias}</span>
-                    <span className="text-xs text-gray-500">{item.count} ({pct}%)</span>
-                  </div>
-                  <div className="h-2 bg-surface-600 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${colors[item.bias] || 'bg-gray-500'}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
+                <div className="h-2 bg-surface-600 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${row.color}`} style={{ width: `${pct}%` }} />
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -186,9 +126,9 @@ function MetricCard({ title, value, subtitle, icon, color }) {
   const colorClasses = {
     primary: 'bg-primary-500/10 text-primary-400 border-primary-500/20',
     emerald: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    blue: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    purple: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-    amber: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    blue:    'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    purple:  'bg-purple-500/10 text-purple-400 border-purple-500/20',
+    amber:   'bg-amber-500/10 text-amber-400 border-amber-500/20',
   };
 
   return (

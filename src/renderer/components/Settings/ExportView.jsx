@@ -7,7 +7,17 @@ const INTRADAY_MODES = [
   { id: 'multiSymbol', label: 'Multi-Symbol' },
 ];
 
-const SWING_STATUSES = ['Pass', 'Fail', 'Partial', 'Cancelled', 'Waiting'];
+const SWING_STATUSES = ['Waiting', 'Successful', 'Failed', 'Cancelled', 'Cost-to-Cost', 'UnPlanned'];
+
+function buildPwFileName(templates, templateId) {
+  const now  = new Date();
+  const dd   = String(now.getDate()).padStart(2, '0');
+  const mmm  = now.toLocaleString('en-US', { month: 'short' });
+  const yyyy = now.getFullYear();
+  const raw  = templates.find((t) => String(t.id) === templateId)?.name || 'Plan-Name';
+  const safe = raw.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_');
+  return `Export_${dd}_${mmm}_${yyyy}_${safe}_TradingPlayBook_HH_MM_SS.csv`;
+}
 
 function StatusMessage({ status }) {
   if (!status) return null;
@@ -91,20 +101,23 @@ export default function ExportView() {
   const [symbolIds, setSymbolIds] = useState([]);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [includeNotes, setIncludeNotes] = useState(false);
-  const [dayFilter, setDayFilter] = useState('all');
-  const [verdictBias, setVerdictBias] = useState('');
-  const [possibilityDisplay, setPossibilityDisplay] = useState('all');
   const [exporting, setExporting] = useState(false);
   const [intradayStatus, setIntradayStatus] = useState(null);
 
+  // ── Plan Wise state ──
+  const [pwTemplates, setPwTemplates]       = useState([]);
+  const [pwTemplateId, setPwTemplateId]     = useState('');
+  const [pwSymbols, setPwSymbols]           = useState([]);
+  const [pwSelectedIds, setPwSelectedIds]   = useState([]);
+  const [pwExporting, setPwExporting]       = useState(false);
+  const [pwStatusMsg, setPwStatusMsg]       = useState(null);
+
   // ── Swing state ──
-  const [swingStockNames, setSwingStockNames] = useState([]);
-  const [swingSelectedNames, setSwingSelectedNames] = useState([]);
+  const [swingSymbols, setSwingSymbols] = useState([]);          // [{id, name}] — symbols with at least one plan
+  const [swingSelectedIds, setSwingSelectedIds] = useState([]);  // currently checked
   const [swingStatus, setSwingStatus] = useState('');
   const [swingDateFrom, setSwingDateFrom] = useState('');
   const [swingDateTo, setSwingDateTo] = useState('');
-  const [swingIncludeAnalysis, setSwingIncludeAnalysis] = useState(false);
   const [swingExporting, setSwingExporting] = useState(false);
   const [swingStatusMsg, setSwingStatusMsg] = useState(null);
 
@@ -117,11 +130,31 @@ export default function ExportView() {
   }, [symbols]);
 
   useEffect(() => {
-    window.api.stockPlan.getDistinctStockNames().then((names) => {
-      setSwingStockNames(names);
-      setSwingSelectedNames(names);
+    window.api.swingPlan.getDistinctSymbols().then((rows) => {
+      const list = rows || [];
+      setSwingSymbols(list);
+      setSwingSelectedIds(list.map((s) => s.id));
     });
   }, []);
+
+  useEffect(() => {
+    if (typeof window.api.swingPlan.getDistinctTemplates !== 'function') return;
+    window.api.swingPlan.getDistinctTemplates().then((rows) => {
+      const list = rows || [];
+      setPwTemplates(list);
+      if (list.length > 0) setPwTemplateId(String(list[0].id));
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!pwTemplateId) return;
+    if (typeof window.api.swingPlan.getDistinctSymbolsByTemplate !== 'function') return;
+    window.api.swingPlan.getDistinctSymbolsByTemplate(Number(pwTemplateId)).then((rows) => {
+      const list = rows || [];
+      setPwSymbols(list);
+      setPwSelectedIds(list.map((s) => s.id));
+    });
+  }, [pwTemplateId]);
 
   // ── Intraday helpers ──
   const toggleSymbol = (id) =>
@@ -139,14 +172,10 @@ export default function ExportView() {
         ? symbols.filter((s) => symbolIds.includes(s.id))
         : [symbols.find((s) => s.id === Number(symbolId))].filter(Boolean);
     return {
-      symbolIds:        selected.map((s) => s.id),
-      symbolNames:      selected.map((s) => s.name),
-      dateFrom:         dateFrom || undefined,
-      dateTo:           dateTo   || undefined,
-      includeNotes,
-      dayFilter,
-      verdictBias:      verdictBias || undefined,
-      possibilityDisplay,
+      symbolIds:   selected.map((s) => s.id),
+      symbolNames: selected.map((s) => s.name),
+      dateFrom:    dateFrom || undefined,
+      dateTo:      dateTo   || undefined,
     };
   };
 
@@ -174,21 +203,49 @@ export default function ExportView() {
     }
   };
 
+  // ── Plan Wise helpers ──
+  const togglePwSymbol = (id) =>
+    setPwSelectedIds((prev) => prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]);
+
+  const handlePlanWiseExport = async () => {
+    if (!pwTemplateId || pwSelectedIds.length === 0 || pwExporting) return;
+    setPwExporting(true);
+    setPwStatusMsg(null);
+    try {
+      const result = await window.api.export.planWiseToCSV({
+        templateId: Number(pwTemplateId),
+        symbolIds:  pwSelectedIds,
+      });
+      if (result.canceled) {
+        setPwStatusMsg(null);
+      } else if (result.success) {
+        const fname = result.filePath.split(/[/\\]/).pop();
+        setPwStatusMsg({ type: 'success', message: `Export complete — ${fname}` });
+        showNotification('Export complete', 'success');
+      } else {
+        setPwStatusMsg({ type: 'error', message: result.error || 'Export failed.' });
+      }
+    } catch (err) {
+      setPwStatusMsg({ type: 'error', message: err.message || 'Export failed.' });
+    } finally {
+      setPwExporting(false);
+    }
+  };
+
   // ── Swing helpers ──
-  const toggleSwingName = (name) =>
-    setSwingSelectedNames((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
+  const toggleSwingSymbol = (id) =>
+    setSwingSelectedIds((prev) => prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]);
 
   const handleSwingExport = async (format) => {
-    if (swingSelectedNames.length === 0 || swingExporting) return;
+    if (swingSelectedIds.length === 0 || swingExporting) return;
     setSwingExporting(true);
     setSwingStatusMsg(null);
     try {
       const params = {
-        stockNames:      swingSelectedNames,
+        symbolIds:       swingSelectedIds,
         executionStatus: swingStatus || undefined,
         dateFrom:        swingDateFrom || undefined,
         dateTo:          swingDateTo   || undefined,
-        includeAnalysis: swingIncludeAnalysis,
       };
       const result = format === 'csv'
         ? await window.api.export.swingToCSV(params)
@@ -214,12 +271,13 @@ export default function ExportView() {
       <div className="flex items-center gap-4">
         <div className="flex gap-1 p-1 bg-surface-800 rounded-lg">
           {[
-            { id: 'intraday', label: 'Intraday' },
-            { id: 'swing',    label: 'Swing Plans' },
+            { id: 'intraday',  label: 'Intraday' },
+            { id: 'swing',     label: 'Swing Plans' },
+            { id: 'planWise',  label: 'Plan Wise' },
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => { setActiveTab(tab.id); setIntradayStatus(null); setSwingStatusMsg(null); }}
+              onClick={() => { setActiveTab(tab.id); setIntradayStatus(null); setSwingStatusMsg(null); setPwStatusMsg(null); }}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 activeTab === tab.id ? 'bg-primary-600 text-white' : 'text-gray-400 hover:text-gray-200'
               }`}
@@ -270,59 +328,10 @@ export default function ExportView() {
               </div>
             </div>
 
-            {/* Plan Selection */}
-            <div className="glass-card p-4 space-y-3">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Plan Selection</span>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">Day Filter</label>
-                <select value={dayFilter} onChange={(e) => setDayFilter(e.target.value)} className="input-field text-sm w-full">
-                  <option value="all">All Days</option>
-                  <option value="hasVerdict">Has Verdict</option>
-                  <option value="hasPlan">Has Plan</option>
-                  <option value="verdictHadPlan">Verdict Had Plan</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">Verdict Bias</label>
-                <select
-                  value={verdictBias}
-                  onChange={(e) => setVerdictBias(e.target.value)}
-                  disabled={dayFilter === 'hasPlan'}
-                  className={`input-field text-sm w-full ${dayFilter === 'hasPlan' ? 'opacity-40' : ''}`}
-                >
-                  <option value="">All Directions</option>
-                  <option value="Bullish">Bullish</option>
-                  <option value="Bearish">Bearish</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">Show Possibilities</label>
-                <select value={possibilityDisplay} onChange={(e) => setPossibilityDisplay(e.target.value)} className="input-field text-sm w-full">
-                  <option value="all">All Possibilities</option>
-                  <option value="playedOut">Played-out Only</option>
-                  <option value="planned">Planned Only</option>
-                </select>
-              </div>
-            </div>
           </div>
 
-          {/* Right — notes + export */}
+          {/* Right — export */}
           <div className="space-y-4">
-            <div className="glass-card p-4">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-3">Intraday Notes</span>
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={includeNotes}
-                  onChange={(e) => setIncludeNotes(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded border-surface-500 text-primary-500 focus:ring-primary-500/30 bg-surface-700 flex-shrink-0"
-                />
-                <div>
-                  <span className="text-sm text-gray-200 font-medium">Include intraday notes</span>
-                  <p className="text-xs text-gray-500 mt-0.5">Adds timestamped intraday notes. For CSV, condensed into one column.</p>
-                </div>
-              </label>
-            </div>
             <StatusMessage status={intradayStatus} />
             <ExportButtons
               isValid={intradayIsValid()}
@@ -402,59 +411,10 @@ export default function ExportView() {
               </div>
             </div>
 
-            {/* Intraday Notes */}
-            <div className="glass-card p-4">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-3">Intraday Notes</span>
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={includeNotes}
-                  onChange={(e) => setIncludeNotes(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded border-surface-500 text-primary-500 focus:ring-primary-500/30 bg-surface-700 flex-shrink-0"
-                />
-                <div>
-                  <span className="text-sm text-gray-200 font-medium">Include intraday notes</span>
-                  <p className="text-xs text-gray-500 mt-0.5">Adds timestamped intraday notes. For CSV, condensed into one column.</p>
-                </div>
-              </label>
-            </div>
           </div>
 
-          {/* Right — plan selection + export */}
+          {/* Right — export */}
           <div className="space-y-4">
-            <div className="glass-card p-4 space-y-3">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Plan Selection</span>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">Day Filter</label>
-                <select value={dayFilter} onChange={(e) => setDayFilter(e.target.value)} className="input-field text-sm w-full">
-                  <option value="all">All Days</option>
-                  <option value="hasVerdict">Has Verdict</option>
-                  <option value="hasPlan">Has Plan</option>
-                  <option value="verdictHadPlan">Verdict Had Plan</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">Verdict Bias</label>
-                <select
-                  value={verdictBias}
-                  onChange={(e) => setVerdictBias(e.target.value)}
-                  disabled={dayFilter === 'hasPlan'}
-                  className={`input-field text-sm w-full ${dayFilter === 'hasPlan' ? 'opacity-40' : ''}`}
-                >
-                  <option value="">All Directions</option>
-                  <option value="Bullish">Bullish</option>
-                  <option value="Bearish">Bearish</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">Show Possibilities</label>
-                <select value={possibilityDisplay} onChange={(e) => setPossibilityDisplay(e.target.value)} className="input-field text-sm w-full">
-                  <option value="all">All Possibilities</option>
-                  <option value="playedOut">Played-out Only</option>
-                  <option value="planned">Planned Only</option>
-                </select>
-              </div>
-            </div>
             <StatusMessage status={intradayStatus} />
             <ExportButtons
               isValid={intradayIsValid()}
@@ -471,28 +431,28 @@ export default function ExportView() {
       {activeTab === 'swing' && (
         <div className="grid grid-cols-2 gap-6">
 
-          {/* Left — stock listbox */}
+          {/* Left — symbol listbox */}
           <div className="glass-card p-4">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Stock Names
-                {swingStockNames.length > 0 && (
+                Symbols
+                {swingSymbols.length > 0 && (
                   <span className="ml-2 text-gray-600 normal-case font-normal">
-                    ({swingSelectedNames.length} of {swingStockNames.length} selected)
+                    ({swingSelectedIds.length} of {swingSymbols.length} selected)
                   </span>
                 )}
               </label>
-              {swingStockNames.length > 0 && (
+              {swingSymbols.length > 0 && (
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => setSwingSelectedNames([...swingStockNames])}
+                    onClick={() => setSwingSelectedIds(swingSymbols.map((s) => s.id))}
                     className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
                   >
                     Select All
                   </button>
                   <span className="text-gray-700">·</span>
                   <button
-                    onClick={() => setSwingSelectedNames([])}
+                    onClick={() => setSwingSelectedIds([])}
                     className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
                   >
                     Deselect All
@@ -501,30 +461,30 @@ export default function ExportView() {
               )}
             </div>
 
-            {swingStockNames.length === 0 ? (
+            {swingSymbols.length === 0 ? (
               <p className="text-xs text-gray-500 py-2">No swing plans found. Create some in Swing · Plans first.</p>
             ) : (
               <div className="border border-surface-600 rounded-lg overflow-y-auto max-h-64 bg-surface-700/30">
-                {swingStockNames.map((name, idx) => (
+                {swingSymbols.map((s, idx) => (
                   <label
-                    key={name}
+                    key={s.id}
                     className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-surface-600/30 transition-colors ${
-                      idx < swingStockNames.length - 1 ? 'border-b border-surface-600/40' : ''
+                      idx < swingSymbols.length - 1 ? 'border-b border-surface-600/40' : ''
                     }`}
                   >
                     <input
                       type="checkbox"
-                      checked={swingSelectedNames.includes(name)}
-                      onChange={() => toggleSwingName(name)}
+                      checked={swingSelectedIds.includes(s.id)}
+                      onChange={() => toggleSwingSymbol(s.id)}
                       className="w-4 h-4 rounded border-surface-500 text-primary-500 focus:ring-primary-500/30 bg-surface-700 flex-shrink-0"
                     />
-                    <span className="text-sm text-gray-200">{name}</span>
+                    <span className="text-sm text-gray-200">{s.name}</span>
                   </label>
                 ))}
               </div>
             )}
-            {swingStockNames.length > 0 && swingSelectedNames.length === 0 && (
-              <p className="text-xs text-red-400 mt-2">Select at least one stock</p>
+            {swingSymbols.length > 0 && swingSelectedIds.length === 0 && (
+              <p className="text-xs text-red-400 mt-2">Select at least one symbol</p>
             )}
           </div>
 
@@ -558,31 +518,134 @@ export default function ExportView() {
               </div>
             </div>
 
-            <div className="glass-card p-4">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={swingIncludeAnalysis}
-                  onChange={(e) => setSwingIncludeAnalysis(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded border-surface-500 text-primary-500 focus:ring-primary-500/30 bg-surface-700 flex-shrink-0"
-                />
-                <div>
-                  <span className="text-sm text-gray-200 font-medium">Include analysis text</span>
-                  <p className="text-xs text-gray-500 mt-0.5">Adds analysis column to CSV. PDF always shows analysis where available.</p>
-                </div>
-              </label>
-            </div>
-
             <StatusMessage status={swingStatusMsg} />
 
             <ExportButtons
-              isValid={swingSelectedNames.length > 0}
+              isValid={swingSelectedIds.length > 0}
               exporting={swingExporting}
               onExportCSV={() => handleSwingExport('csv')}
               onExportPDF={() => handleSwingExport('pdf')}
-              hint="CSV omits charts · PDF includes chart images"
+              hint="CSV omits screenshots · PDF includes all data"
             />
           </div>
+        </div>
+      )}
+
+      {/* ──────────── Plan Wise tab ──────────── */}
+      {activeTab === 'planWise' && (
+        <div className="grid grid-cols-2 gap-6">
+
+          {/* Left — template picker + symbol list */}
+          <div className="space-y-4">
+            <div className="glass-card p-4 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">Plan (Template)</label>
+                {pwTemplates.length === 0 ? (
+                  <p className="text-xs text-gray-500 py-2">No plans with instances yet. Create swing plans first.</p>
+                ) : (
+                  <select
+                    value={pwTemplateId}
+                    onChange={(e) => setPwTemplateId(e.target.value)}
+                    className="input-field text-sm w-full"
+                  >
+                    {pwTemplates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}{t.group_name ? ` — ${t.group_name}` : ''} ({t.plan_count})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Symbols
+                    {pwSymbols.length > 0 && (
+                      <span className="ml-2 text-gray-600 normal-case font-normal">
+                        ({pwSelectedIds.length} of {pwSymbols.length} selected)
+                      </span>
+                    )}
+                  </label>
+                  {pwSymbols.length > 0 && (
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => setPwSelectedIds(pwSymbols.map((s) => s.id))} className="text-xs text-primary-400 hover:text-primary-300 transition-colors">Select All</button>
+                      <span className="text-gray-700">·</span>
+                      <button onClick={() => setPwSelectedIds([])} className="text-xs text-primary-400 hover:text-primary-300 transition-colors">Deselect All</button>
+                    </div>
+                  )}
+                </div>
+
+                {pwSymbols.length === 0 ? (
+                  <p className="text-xs text-gray-500 py-2">
+                    {pwTemplateId ? 'No instances of this plan exist yet.' : 'Select a plan above.'}
+                  </p>
+                ) : (
+                  <div className="border border-surface-600 rounded-lg overflow-y-auto max-h-52 bg-surface-700/30">
+                    {pwSymbols.map((s, idx) => (
+                      <label
+                        key={s.id}
+                        className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-surface-600/30 transition-colors ${
+                          idx < pwSymbols.length - 1 ? 'border-b border-surface-600/40' : ''
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={pwSelectedIds.includes(s.id)}
+                          onChange={() => togglePwSymbol(s.id)}
+                          className="w-4 h-4 rounded border-surface-500 text-primary-500 focus:ring-primary-500/30 bg-surface-700 flex-shrink-0"
+                        />
+                        <span className="text-sm text-gray-200">{s.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {pwSymbols.length > 0 && pwSelectedIds.length === 0 && (
+                  <p className="text-xs text-red-400 mt-1">Select at least one symbol</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right — column preview + export */}
+          <div className="space-y-4">
+            <div className="glass-card p-4 space-y-2">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">CSV Columns</p>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {['Date', 'Symbol', 'Bias', 'Target', 'Stop', 'Execution Status'].map((col) => (
+                  <span key={col} className="text-[11px] px-2 py-0.5 rounded bg-surface-700 border border-surface-600 text-gray-400">{col}</span>
+                ))}
+              </div>
+              <p className="text-[11px] text-gray-600 pt-1 break-all">
+                File: <span className="text-gray-400 italic">{buildPwFileName(pwTemplates, pwTemplateId)}</span>
+              </p>
+            </div>
+
+            <StatusMessage status={pwStatusMsg} />
+
+            <button
+              onClick={handlePlanWiseExport}
+              disabled={!pwTemplateId || pwSelectedIds.length === 0 || pwExporting}
+              className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                pwTemplateId && pwSelectedIds.length > 0 && !pwExporting
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                  : 'bg-surface-700 border-surface-600 text-gray-600 cursor-not-allowed'
+              }`}
+            >
+              {pwExporting ? (
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              )}
+              Export as CSV
+            </button>
+          </div>
+
         </div>
       )}
 

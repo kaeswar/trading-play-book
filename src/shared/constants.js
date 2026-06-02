@@ -1,75 +1,28 @@
-export const POSSIBILITIES = [
-  { code: 'Open_Abv_PDR', bias: 'Bullish', label: 'Open above Previous Day Range' },
-  { code: 'Open_Abv_VAH_IR', bias: 'Bullish', label: 'Open above VAH and Inside Range' },
-  { code: 'Open_Abv_POC_IV', bias: 'Bullish', label: 'Open above POC and Inside VAH' },
-  { code: 'Open_Bel_POC_IV', bias: 'Bearish', label: 'Open below POC Inside VA' },
-  { code: 'Open_Bel_VAL_IR', bias: 'Bearish', label: 'Open below VAL and Inside Range' },
-  { code: 'Open_Bel_PDR', bias: 'Bearish', label: 'Open below Previous Day Range' },
-];
-
 export const OUTCOMES = ['Accepted', 'Rejected'];
 
-export const OUTCOME_COLORS = {
-  Accepted: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30' },
-  Rejected: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30' },
-};
-
-export const BIAS_COLORS = {
-  Bullish: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/30', accent: 'from-blue-500 to-cyan-500' },
-  Bearish: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30', accent: 'from-red-500 to-orange-500' },
-};
-
-export function formatPossibilityCode(code) {
-  return code.replace(/_/g, ' ');
-}
-
-// Market Behavior mapping: possibility_code + outcome → behavior tag
-export const BEHAVIOR_MAPPING = {
-  'Open_Abv_PDR_Accepted': 'Super Bullish',
-  'Open_Abv_PDR_Rejected': 'Bearish',
-  'Open_Abv_VAH_IR_Accepted': 'Bullish (Medium)',
-  'Open_Abv_VAH_IR_Rejected': 'Double Side Auction',
-  'Open_Abv_POC_IV_Accepted': 'Double Side Auction',
-  'Open_Abv_POC_IV_Rejected': 'Bullish (Medium)',
-  'Open_Bel_POC_IV_Accepted': 'Suspect Bearish',
-  'Open_Bel_POC_IV_Rejected': 'Bullish (Medium)',
-  'Open_Bel_VAL_IR_Accepted': 'Medium Bearish',
-  'Open_Bel_VAL_IR_Rejected': 'Double Side Auction',
-  'Open_Bel_PDR_Accepted': 'Super Bearish',
-  'Open_Bel_PDR_Rejected': 'Bullish',
-};
-
-export function getBehaviorTag(possibilityCode, outcome) {
-  return BEHAVIOR_MAPPING[`${possibilityCode}_${outcome}`] || null;
-}
-
-// Returns green for bullish results, red for bearish results regardless of Accepted/Rejected label
-export function getOutcomeColors(outcome, bias) {
-  if (!outcome || !bias) return OUTCOME_COLORS[outcome] || OUTCOME_COLORS.Accepted;
-  const isBullishResult =
-    (bias === 'Bullish' && outcome === 'Accepted') ||
-    (bias === 'Bearish' && outcome === 'Rejected');
-  return isBullishResult ? OUTCOME_COLORS.Accepted : OUTCOME_COLORS.Rejected;
-}
-
 export const BEHAVIOR_TAGS = {
-  'Super Bullish': { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30' },
-  'Bullish (Medium)': { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/30' },
-  'Bullish': { bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500/30' },
-  'Range Bound': { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30' },
-  'Neutral': { bg: 'bg-gray-500/20', text: 'text-gray-300', border: 'border-gray-500/30' },
-  'Double Side Auction': { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30' },
-  'Suspect Bearish': { bg: 'bg-orange-500/20', text: 'text-orange-400', border: 'border-orange-500/30' },
-  'Medium Bearish': { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30' },
-  'Bearish': { bg: 'bg-rose-500/20', text: 'text-rose-400', border: 'border-rose-500/30' },
-  'Super Bearish': { bg: 'bg-red-700/20', text: 'text-red-300', border: 'border-red-700/30' },
+  'Super Bullish':       { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30' },
+  'Bullish (Medium)':    { bg: 'bg-blue-500/20',    text: 'text-blue-400',    border: 'border-blue-500/30' },
+  'Bullish':             { bg: 'bg-cyan-500/20',    text: 'text-cyan-400',    border: 'border-cyan-500/30' },
+  'Possibly Bullish':    { bg: 'bg-sky-500/15',     text: 'text-sky-300',     border: 'border-sky-500/25' },
+  'Range Bound':         { bg: 'bg-slate-500/20',   text: 'text-slate-400',   border: 'border-slate-500/30' },
+  'Neutral':             { bg: 'bg-gray-500/20',    text: 'text-gray-300',    border: 'border-gray-500/30' },
+  'Double Side Auction': { bg: 'bg-amber-500/20',   text: 'text-amber-400',   border: 'border-amber-500/30' },
+  'Possibly Bearish':    { bg: 'bg-rose-500/15',    text: 'text-rose-300',    border: 'border-rose-500/25' },
+  'Suspect Bearish':     { bg: 'bg-orange-500/20',  text: 'text-orange-400',  border: 'border-orange-500/30' },
+  'Medium Bearish':      { bg: 'bg-red-500/20',     text: 'text-red-400',     border: 'border-red-500/30' },
+  'Bearish':             { bg: 'bg-rose-500/20',    text: 'text-rose-400',    border: 'border-rose-500/30' },
+  'Super Bearish':       { bg: 'bg-red-700/20',     text: 'text-red-300',     border: 'border-red-700/30' },
 };
 
 export const BEHAVIOR_TAG_ORDER = [
   'Super Bullish',
   'Bullish (Medium)',
   'Bullish',
+  'Possibly Bullish',
+  'Range Bound',
   'Double Side Auction',
+  'Possibly Bearish',
   'Suspect Bearish',
   'Medium Bearish',
   'Bearish',
@@ -86,45 +39,40 @@ export function formatDate(dateStr) {
   });
 }
 
-// Shared bias tags (used by both Swing Plans and Custom Plans)
-export const STOCK_PLAN_BIAS_TAGS = ['Super Bullish', 'Bullish', 'Range Bound', 'Bearish', 'Super Bearish'];
-
-export const STOCK_PLAN_BIAS_COLORS = {
-  'Super Bullish': { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30' },
-  'Bullish':       { bg: 'bg-cyan-500/20',    text: 'text-cyan-400',    border: 'border-cyan-500/30' },
-  'Range Bound':   { bg: 'bg-slate-500/20',   text: 'text-slate-400',   border: 'border-slate-500/30' },
-  'Bearish':       { bg: 'bg-red-500/20',     text: 'text-red-400',     border: 'border-red-500/30' },
-  'Super Bearish': { bg: 'bg-red-950/60',     text: 'text-red-200',     border: 'border-red-800/70' },
-};
-
-// Stock Plan constants
-export const EXECUTION_STATUSES = ['Pass', 'Fail', 'Partial', 'Cancelled', 'Waiting'];
-
-export const EXECUTION_STATUS_COLORS = {
-  Pass: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30' },
-  Fail: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30' },
-  Partial: { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30' },
-  Cancelled: { bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/30' },
-  Waiting: { bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500/30' },
-};
-
-// Custom Plan bias tags — same list as Swing Plans
-export const CUSTOM_PLAN_BIAS_TAGS = [
+// Shared 7-tag bias set used by templates, day_plans, and swing plans.
+// 'Possibly Bullish' / 'Possibly Bearish' are tentative directional reads (e.g. opens around POC).
+export const STOCK_PLAN_BIAS_TAGS = [
   'Super Bullish',
   'Bullish',
+  'Possibly Bullish',
   'Range Bound',
+  'Possibly Bearish',
   'Bearish',
   'Super Bearish',
 ];
 
-// Custom Plan verdict statuses
-export const CUSTOM_VERDICT_STATUSES = ['Pass', 'Fail', 'Partial', 'Cancelled'];
+export const STOCK_PLAN_BIAS_COLORS = {
+  'Super Bullish':    { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30' },
+  'Bullish':          { bg: 'bg-cyan-500/20',    text: 'text-cyan-400',    border: 'border-cyan-500/30' },
+  'Possibly Bullish': { bg: 'bg-sky-500/15',     text: 'text-sky-300',     border: 'border-sky-500/25' },
+  'Range Bound':      { bg: 'bg-slate-500/20',   text: 'text-slate-400',   border: 'border-slate-500/30' },
+  'Possibly Bearish': { bg: 'bg-rose-500/15',    text: 'text-rose-300',    border: 'border-rose-500/25' },
+  'Bearish':          { bg: 'bg-red-500/20',     text: 'text-red-400',     border: 'border-red-500/30' },
+  'Super Bearish':    { bg: 'bg-red-950/60',     text: 'text-red-200',     border: 'border-red-800/70' },
+};
 
-export const CUSTOM_VERDICT_COLORS = {
-  Pass: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30' },
-  Fail: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30' },
-  Partial: { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30' },
-  Cancelled: { bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/30' },
+// Day-plan execution status (post-market verdict for a single directional plan).
+// 'UnPlanned' = the trade played out for reasons outside the prepared target/stop scenario
+// (e.g. unexpected news, off-script exit). Tracked separately so it doesn't pollute Successful/Failed stats.
+export const DAY_PLAN_STATUSES = ['Waiting', 'Successful', 'Failed', 'Cancelled', 'Cost-to-Cost', 'UnPlanned'];
+
+export const DAY_PLAN_STATUS_COLORS = {
+  'Waiting':      { bg: 'bg-surface-600/40',  text: 'text-gray-400',    border: 'border-surface-500/40' },
+  'Successful':   { bg: 'bg-emerald-500/20',  text: 'text-emerald-400', border: 'border-emerald-500/30' },
+  'Failed':       { bg: 'bg-red-500/20',      text: 'text-red-400',     border: 'border-red-500/30' },
+  'Cancelled':    { bg: 'bg-gray-500/20',     text: 'text-gray-400',    border: 'border-gray-500/30' },
+  'Cost-to-Cost': { bg: 'bg-amber-500/20',    text: 'text-amber-400',   border: 'border-amber-500/30' },
+  'UnPlanned':    { bg: 'bg-violet-500/20',   text: 'text-violet-300',  border: 'border-violet-500/30' },
 };
 
 export const TIMEFRAMES = ['Monthly', 'Weekly', 'Daily', '4Hrs', '1Hrs'];
@@ -186,3 +134,34 @@ export function getToday() {
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+// === Plan Template constants (Phase A) ===
+
+export const TRADE_TYPES = ['Intraday', 'Swing', 'Both'];
+
+export const TRADE_TYPE_COLORS = {
+  Intraday: { bg: 'bg-indigo-500/20', text: 'text-indigo-400', border: 'border-indigo-500/30' },
+  Swing:    { bg: 'bg-teal-500/20',   text: 'text-teal-400',   border: 'border-teal-500/30' },
+  Both:     { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/30' },
+};
+
+// Template bias picker uses the same 5-tag set as Swing/Custom plans
+export const TEMPLATE_BIAS_TAGS = STOCK_PLAN_BIAS_TAGS;
+
+// Auto-derivation: when an outcome's behavior_tag is NULL, render its bias as the tag.
+// Bias values are valid behavior-tag keys (the 5-tag set is a subset of BEHAVIOR_TAGS keys).
+export function deriveBehaviorTag(bias, explicit) {
+  if (explicit) return explicit;
+  return bias || null;
+}
+
+// Coarse bullish/bearish grouping used by filters (e.g. "show me anything bullish")
+export function isBullishBias(bias) {
+  return bias === 'Bullish' || bias === 'Super Bullish';
+}
+export function isBearishBias(bias) {
+  return bias === 'Bearish' || bias === 'Super Bearish';
+}
+
+// Seeded by the DB layer; surfaced here so the UI knows the system group's name
+export const SYSTEM_TEMPLATE_GROUP = 'Market Profile Openings';
