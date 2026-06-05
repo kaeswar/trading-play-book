@@ -64,7 +64,7 @@ export const STOCK_PLAN_BIAS_COLORS = {
 // Day-plan execution status (post-market verdict for a single directional plan).
 // 'UnPlanned' = the trade played out for reasons outside the prepared target/stop scenario
 // (e.g. unexpected news, off-script exit). Tracked separately so it doesn't pollute Successful/Failed stats.
-export const DAY_PLAN_STATUSES = ['Waiting', 'Successful', 'Failed', 'Cancelled', 'Cost-to-Cost', 'UnPlanned'];
+export const DAY_PLAN_STATUSES = ['Waiting', 'Successful', 'Failed', 'Cancelled', 'Cost-to-Cost', 'UnPlanned', 'In-Active'];
 
 export const DAY_PLAN_STATUS_COLORS = {
   'Waiting':      { bg: 'bg-surface-600/40',  text: 'text-gray-400',    border: 'border-surface-500/40' },
@@ -73,6 +73,7 @@ export const DAY_PLAN_STATUS_COLORS = {
   'Cancelled':    { bg: 'bg-gray-500/20',     text: 'text-gray-400',    border: 'border-gray-500/30' },
   'Cost-to-Cost': { bg: 'bg-amber-500/20',    text: 'text-amber-400',   border: 'border-amber-500/30' },
   'UnPlanned':    { bg: 'bg-violet-500/20',   text: 'text-violet-300',  border: 'border-violet-500/30' },
+  'In-Active':    { bg: 'bg-slate-500/20',    text: 'text-slate-400',   border: 'border-slate-500/30' },
 };
 
 export const TIMEFRAMES = ['Monthly', 'Weekly', 'Daily', '4Hrs', '1Hrs'];

@@ -7,6 +7,7 @@ import {
   formatDate, deriveBehaviorTag,
 } from '../../../shared/constants';
 import IntradayNotesModal from '../shared/IntradayNotesModal';
+import DayIntradayNotesModal from '../shared/DayIntradayNotesModal';
 import DayPlanScreenshotUploader from '../Phase1/DayPlanScreenshotUploader';
 
 // Editable post-market view. User updates each plan's execution_status + outcome_notes.
@@ -20,6 +21,8 @@ export default function VerdictView() {
   const [noteCounts, setNoteCounts] = useState({});
   const [loading, setLoading]       = useState(true);
   const [openModal, setOpenModal]   = useState(null);
+  const [dayNotesOpen, setDayNotesOpen] = useState(false);
+  const [dayNoteCount, setDayNoteCount] = useState(0);
   const [allExpanded, setAllExpanded] = useState(false);
 
   const loadAll = useCallback(async () => {
@@ -34,12 +37,14 @@ export default function VerdictView() {
         return;
       }
       setTradingDay(day);
-      const [plans, counts] = await Promise.all([
+      const [plans, counts, dayCount] = await Promise.all([
         getByTradingDay(day.id),
         window.api.intradayNote.countByTradingDay(day.id),
+        window.api.dayIntradayNote.count(day.id),
       ]);
       setDayPlans(plans);
       setNoteCounts(counts || {});
+      setDayNoteCount(dayCount || 0);
     } finally {
       setLoading(false);
     }
@@ -97,12 +102,13 @@ export default function VerdictView() {
     );
   }
 
-  const successCount = dayPlans.filter(p => p.execution_status === 'Successful').length;
-  const failedCount  = dayPlans.filter(p => p.execution_status === 'Failed').length;
-  const c2cCount     = dayPlans.filter(p => p.execution_status === 'Cost-to-Cost').length;
+  const successCount   = dayPlans.filter(p => p.execution_status === 'Successful').length;
+  const failedCount    = dayPlans.filter(p => p.execution_status === 'Failed').length;
+  const c2cCount       = dayPlans.filter(p => p.execution_status === 'Cost-to-Cost').length;
   const unplannedCount = dayPlans.filter(p => p.execution_status === 'UnPlanned').length;
   const cancelledCount = dayPlans.filter(p => p.execution_status === 'Cancelled').length;
-  const waitingCount = dayPlans.filter(p => !p.execution_status || p.execution_status === 'Waiting').length;
+  const inactiveCount  = dayPlans.filter(p => p.execution_status === 'In-Active').length;
+  const waitingCount   = dayPlans.filter(p => !p.execution_status || p.execution_status === 'Waiting').length;
 
   return (
     <div className="space-y-5">
@@ -120,7 +126,21 @@ export default function VerdictView() {
             {c2cCount > 0 && <Stat label="C2C" value={c2cCount} color="amber" />}
             {unplannedCount > 0 && <Stat label="UnPlanned" value={unplannedCount} color="violet" />}
             {cancelledCount > 0 && <Stat label="Cancelled" value={cancelledCount} color="gray" />}
+            {inactiveCount > 0 && <Stat label="In-Active" value={inactiveCount} color="slate" />}
             {waitingCount > 0 && <Stat label="Waiting" value={waitingCount} color="gray" />}
+            <button
+              onClick={() => setDayNotesOpen(true)}
+              className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium transition-colors flex items-center gap-1.5 ${
+                dayNoteCount > 0
+                  ? 'bg-sky-500/20 border-sky-500/50 text-sky-300 hover:bg-sky-500/30'
+                  : 'bg-surface-700/60 border-surface-500/60 text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              {dayNoteCount > 0 ? `Day Notes (${dayNoteCount})` : 'Day Notes'}
+            </button>
           </div>
         </div>
       </div>
@@ -166,6 +186,15 @@ export default function VerdictView() {
           onClose={() => { setOpenModal(null); loadAll(); }}
         />
       )}
+
+      {dayNotesOpen && (
+        <DayIntradayNotesModal
+          tradingDay={tradingDay}
+          symbolName={selectedSymbol?.name}
+          date={selectedDate}
+          onClose={() => { setDayNotesOpen(false); loadAll(); }}
+        />
+      )}
     </div>
   );
 }
@@ -176,6 +205,7 @@ function Stat({ label, value, color = 'gray' }) {
     red:     'text-red-400',
     amber:   'text-amber-400',
     violet:  'text-violet-300',
+    slate:   'text-slate-400',
     gray:    'text-gray-300',
   };
   return (

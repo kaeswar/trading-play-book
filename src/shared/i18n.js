@@ -4,6 +4,7 @@ export const translations = {
     navIntraday:    'Intraday · Symbols',
     navSwing:       'Swing · Any Symbol',
     navReports:     'Reports',
+    navJournal:     'Journal',
 
     // Nav — items
     preMarket:      'Pre-Market Plan',
@@ -13,12 +14,14 @@ export const translations = {
     swingGallery:   'Gallery',
     reportIntraday: 'Intraday',
     reportSwing:    'Swing Plans',
+    sessionJournal: 'Session Journal',
 
     // Nav — subtitles
     subCreateEdit:        'Create / Edit plans',
     subUpdateResult:      "Update Plan's Actions",
     subViewDelete:        'View / Delete Plan',
     subCreateEditUpdate:  'Create / Edit / Update Result',
+    subMarketProfile:     'AMT period analysis',
 
     // Section headers
     defaultPlanVerdict:   'Default Plan Verdict',

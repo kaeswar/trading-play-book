@@ -32,6 +32,13 @@ export default function TemplateEditorModal({ template, groups, onSave, onClose 
   const [tags, setTags]               = useState(template.tags || '');
   const [error, setError]             = useState('');
 
+  // Screenshot state
+  // edit mode: screenshotPath tracks what's already saved in DB
+  // create mode: pendingSrc holds data to attach after the template is created
+  const [screenshotPath, setScreenshotPath] = useState(template.screenshot_path || null);
+  const [pendingSrc, setPendingSrc]         = useState(null); // { type:'file'|'buffer', srcPath?, buffer?, fileName }
+  const [sshUploading, setSshUploading]     = useState(false);
+
   useEffect(() => {
     setTradeType(template.trade_type || 'Intraday');
     setGroupId(template.group_id || '');
@@ -42,7 +49,81 @@ export default function TemplateEditorModal({ template, groups, onSave, onClose 
     setPosSizing(template.position_sizing_note || '');
     setTags(template.tags || '');
     setError('');
+    setScreenshotPath(template.screenshot_path || null);
+    setPendingSrc(null);
   }, [template]);
+
+  // --- Screenshot helpers ---
+
+  const _attachFileEdit = async (srcPath) => {
+    const fileName = `tpl_${template.id}_${Date.now()}_${srcPath.split(/[/\\]/).pop()}`;
+    const res = await window.api.planTemplate.attachScreenshot(template.id, srcPath, fileName);
+    if (res.success) {
+      const updated = await window.api.planTemplate.get(template.id);
+      setScreenshotPath(updated?.screenshot_path || null);
+    }
+  };
+
+  const _attachBufferEdit = async (buffer, ext) => {
+    const fileName = `tpl_${template.id}_paste_${Date.now()}.${ext}`;
+    const res = await window.api.planTemplate.attachScreenshotFromBuffer(template.id, buffer, fileName);
+    if (res.success) {
+      const updated = await window.api.planTemplate.get(template.id);
+      setScreenshotPath(updated?.screenshot_path || null);
+    }
+  };
+
+  const handleSshAttach = async () => {
+    const filePaths = await window.api.dialog.openFile();
+    if (!filePaths?.length) return;
+    const srcPath = filePaths[0];
+    if (isEdit) {
+      setSshUploading(true);
+      try { await _attachFileEdit(srcPath); } finally { setSshUploading(false); }
+    } else {
+      const fileName = `tpl_new_${Date.now()}_${srcPath.split(/[/\\]/).pop()}`;
+      setPendingSrc({ type: 'file', srcPath, fileName });
+    }
+  };
+
+  const handleSshRemove = async () => {
+    if (!window.confirm('Remove the reference chart?')) return;
+    if (isEdit) {
+      setSshUploading(true);
+      try {
+        await window.api.planTemplate.removeScreenshot(template.id);
+        setScreenshotPath(null);
+      } finally { setSshUploading(false); }
+    } else {
+      setPendingSrc(null);
+    }
+  };
+
+  const handlePaste = async (e) => {
+    const tag = e.target?.tagName?.toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    const items = e.clipboardData?.items;
+    for (const item of items || []) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const hasExisting = isEdit ? !!screenshotPath : !!pendingSrc;
+        if (hasExisting && !window.confirm('Replace the existing reference chart?')) return;
+        const file = item.getAsFile();
+        if (!file) return;
+        const buffer = new Uint8Array(await file.arrayBuffer());
+        const ext = item.type.split('/')[1] === 'jpeg' ? 'jpg' : item.type.split('/')[1];
+        if (isEdit) {
+          setSshUploading(true);
+          try { await _attachBufferEdit(buffer, ext); } finally { setSshUploading(false); }
+        } else {
+          setPendingSrc({ type: 'buffer', buffer, fileName: `tpl_new_paste_${Date.now()}.${ext}` });
+        }
+        return;
+      }
+    }
+  };
+
+  // --- Form save ---
 
   const handleSave = () => {
     if (!name.trim()) { setError(t('nameRequired')); return; }
@@ -58,6 +139,7 @@ export default function TemplateEditorModal({ template, groups, onSave, onClose 
       behaviorTag: behaviorTag || null,
       positionSizingNote: posSizing.trim() || null,
       tags: tags.trim() || null,
+      pendingSrc: isEdit ? undefined : pendingSrc,
     });
   };
 
@@ -65,7 +147,7 @@ export default function TemplateEditorModal({ template, groups, onSave, onClose 
   const tagColors = effectiveTag ? BEHAVIOR_TAGS[effectiveTag] : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onPaste={handlePaste}>
       <div className="bg-surface-800 border border-surface-600 rounded-xl w-full max-w-2xl h-[85vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-5 py-3 border-b border-surface-600/50">
           <div>
@@ -183,6 +265,97 @@ export default function TemplateEditorModal({ template, groups, onSave, onClose 
               </select>
               <p className="text-[10px] text-gray-600 mt-1">{t('autoDerivedHint')}</p>
             </div>
+          </div>
+
+          {/* Reference chart screenshot */}
+          <div className="bg-surface-900/40 border border-surface-600/30 rounded-lg p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-300 flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Reference Chart
+              </span>
+              <span className="text-[10px] text-gray-600">Ctrl+V to paste</span>
+            </div>
+
+            {sshUploading ? (
+              <p className="text-[11px] text-gray-500">Uploading…</p>
+            ) : isEdit ? (
+              screenshotPath ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-teal-400 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Chart attached
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => window.api.image.openViewer(screenshotPath)}
+                      className="text-[11px] text-primary-400 hover:text-primary-300 transition-colors"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={handleSshAttach}
+                      className="text-[11px] text-gray-400 hover:text-gray-200 transition-colors"
+                    >
+                      Replace
+                    </button>
+                    <button
+                      onClick={handleSshRemove}
+                      className="text-[11px] text-red-500/60 hover:text-red-400 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-gray-600 italic">No chart attached</span>
+                  <button
+                    onClick={handleSshAttach}
+                    className="text-[11px] text-primary-400 hover:text-primary-300 transition-colors flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Attach
+                  </button>
+                </div>
+              )
+            ) : (
+              pendingSrc ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-teal-400 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    1 image ready to attach
+                  </span>
+                  <button
+                    onClick={handleSshRemove}
+                    className="text-[11px] text-red-500/60 hover:text-red-400 transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-gray-600 italic">No chart — will attach after creating</span>
+                  <button
+                    onClick={handleSshAttach}
+                    className="text-[11px] text-primary-400 hover:text-primary-300 transition-colors flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Attach
+                  </button>
+                </div>
+              )
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-surface-600/30">

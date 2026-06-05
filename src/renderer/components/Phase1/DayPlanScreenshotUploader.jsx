@@ -36,9 +36,10 @@ export default function DayPlanScreenshotUploader({
       await doUpload();
       setJustUploaded(true);
       await onRefresh();
-    } catch {
+    } catch (err) {
+      console.error('[Screenshot] upload failed:', err);
       setJustUploaded(false);
-      showNotification('Failed to upload screenshot', 'error');
+      showNotification(`Failed to attach screenshot: ${err?.message || err}`, 'error');
     } finally {
       setUploading(false);
     }

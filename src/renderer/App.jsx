@@ -1,3 +1,4 @@
+/* global __APP_VERSION__ */
 import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './store/appStore.jsx';
 import { useLanguage } from './hooks/useLanguage';
@@ -12,6 +13,7 @@ import SwingReport from './components/Reports/SwingReport';
 import AboutModal from './components/shared/AboutModal';
 import UserGuideModal from './components/shared/UserGuideModal';
 import StyledDatePicker from './components/shared/StyledDatePicker';
+import SessionJournalPage from './components/Journal/SessionJournalPage';
 
 const SETTINGS_TREE = [
   {
@@ -39,6 +41,11 @@ const SETTINGS_TREE = [
     label: 'Backup / Restore',
     icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
   },
+  {
+    id: 'brokerIntegration',
+    label: 'Broker Integration',
+    icon: 'M13 10V3L4 14h7v7l9-11h-7z',
+  },
 ];
 
 const INTRADAY_NAV = [
@@ -57,6 +64,10 @@ const REPORTS_NAV = [
   { id: 'reportSwing',    labelKey: 'reportSwing',    icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
 ];
 
+const JOURNAL_NAV = [
+  { id: 'journal', labelKey: 'sessionJournal', subKey: 'subMarketProfile', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
+];
+
 const PAGE_META = {
   planning:       { title: 'Pre-Market Planning',    sub: 'Document your trading expectations before market opens' },
   verdict:        { title: "Update Plan's Verdict",     sub: "Record each plan's outcome after market close" },
@@ -69,6 +80,114 @@ const PAGE_META = {
 };
 
 const INTRADAY_VIEWS = new Set(['planning', 'verdict', 'gallery']);
+
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.0';
+
+const STATUS_LABELS = {
+  planning:       'Pre-Market',
+  verdict:        'Post-Market',
+  gallery:        'Gallery',
+  swingPlans:     'Swing Plans',
+  swingGallery:   'Swing Gallery',
+  settings:       'Settings',
+  reportIntraday: 'Intraday Report',
+  reportSwing:    'Swing Report',
+  journal:        'Session Journal',
+};
+
+const VIEW_DOT = {
+  planning:       '#f59e0b',
+  verdict:        '#10b981',
+  gallery:        '#8b5cf6',
+  swingPlans:     '#f97316',
+  swingGallery:   '#f97316',
+  journal:        '#0077BB',
+  settings:       '#6b7280',
+  reportIntraday: '#06b6d4',
+  reportSwing:    '#06b6d4',
+};
+
+function Divider() {
+  return <span className="w-px h-3 bg-surface-600/50 shrink-0" />;
+}
+
+function Chip({ children, accent = false }) {
+  return (
+    <span className={`px-2 truncate ${accent ? 'text-gray-300 font-medium' : 'text-gray-500'}`}>
+      {children}
+    </span>
+  );
+}
+
+function StatusBar() {
+  const { currentView, selectedSymbol, selectedDate, statusBarInfo } = useApp();
+
+  const viewLabel  = STATUS_LABELS[currentView] ?? currentView;
+  const dotColor   = VIEW_DOT[currentView] ?? '#6b7280';
+  const isIntraday = INTRADAY_VIEWS.has(currentView);
+  const isJournal  = currentView === 'journal';
+  const isSettings = currentView === 'settings';
+
+  return (
+    <div className="h-6 shrink-0 flex items-center border-t border-surface-600/30 bg-surface-800/70 text-[10px] select-none overflow-hidden">
+
+      {/* Left group: view + context */}
+      <div className="flex items-center h-full border-r border-surface-600/30 pr-1">
+        <div className="flex items-center gap-1.5 px-2.5">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: dotColor }} />
+          <span className="text-gray-400 font-medium whitespace-nowrap">{viewLabel}</span>
+        </div>
+
+        {/* Journal context */}
+        {isJournal && statusBarInfo && (
+          <>
+            <Divider />
+            <Chip accent>{statusBarInfo.instrument}</Chip>
+            <Divider />
+            <Chip>{statusBarInfo.sessionDate}</Chip>
+            {statusBarInfo.tpoLabel && (
+              <>
+                <Divider />
+                <span className="px-2 text-[10px] font-semibold whitespace-nowrap"
+                  style={{ color: '#7ab8e8' }}>
+                  {statusBarInfo.tpoLabel}
+                </span>
+              </>
+            )}
+          </>
+        )}
+
+        {/* Settings context */}
+        {isSettings && statusBarInfo?.settingsSection && (
+          <>
+            <Divider />
+            <Chip accent>{statusBarInfo.settingsSection}</Chip>
+          </>
+        )}
+
+        {/* Intraday context */}
+        {isIntraday && selectedSymbol && (
+          <>
+            <Divider />
+            <Chip accent>{selectedSymbol.name}</Chip>
+            {selectedDate && (
+              <>
+                <Divider />
+                <Chip>{selectedDate}</Chip>
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Right group: version */}
+      <div className="flex items-center h-full ml-auto border-l border-surface-600/30 pl-1">
+        <Chip>v{APP_VERSION}</Chip>
+      </div>
+
+    </div>
+  );
+}
 
 function NavButton({ item, currentView, onClick, t }) {
   const active = currentView === item.id;
@@ -106,18 +225,31 @@ function AppContent() {
     selectedSymbol, symbols, setSelectedSymbol,
     selectedDate, setSelectedDate,
     saveDayPlanFn, savingDayPlan, setRefreshDatesFn,
+    setStatusBarInfo,
   } = useApp();
   const { t, language, setLanguage } = useLanguage();
 
-  const [showAbout, setShowAbout] = useState(false);
-  const [showGuide, setShowGuide] = useState(false);
+  const [showAbout, setShowAbout]       = useState(false);
+  const [showGuide, setShowGuide]       = useState(false);
+  const [journalNavOpen, setJournalNavOpen] = useState(true);
+  const [appNavOpen, setAppNavOpen]         = useState(true);
+
+  useEffect(() => {
+    if (currentView !== 'journal') setJournalNavOpen(true);
+  }, [currentView]);
 
   useEffect(() => {
     window.api.on('menu:open-about', () => setShowAbout(true));
     window.api.on('menu:open-guide', () => setShowGuide(true));
   }, []);
   const [availableDates, setAvailableDates] = useState([]);
-  const [settingsSelected, setSettingsSelected] = useState('planTemplates');
+  const [settingsSelected, setSettingsSelected] = useState(null);
+
+  useEffect(() => {
+    if (currentView !== 'settings') { setStatusBarInfo(null); return; }
+    const section = SETTINGS_TREE.find(s => s.id === settingsSelected);
+    setStatusBarInfo(section ? { settingsSection: section.label } : null);
+  }, [currentView, settingsSelected]);
 
   useEffect(() => { loadSymbols(); }, []);
 
@@ -144,22 +276,36 @@ function AppContent() {
   const meta = PAGE_META[currentView] || {};
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface-900">
+    <div className="flex flex-col h-screen overflow-hidden bg-surface-900">
+      <div className="flex flex-1 overflow-hidden">
       {/* ── Sidebar ── */}
-      <aside className="w-64 bg-surface-800 border-r border-surface-600/50 flex flex-col">
+      <aside className={`bg-surface-800 border-r border-surface-600/50 flex flex-col transition-[width] duration-200 overflow-hidden shrink-0 ${
+        (currentView === 'journal' ? !journalNavOpen : !appNavOpen) ? 'w-0' : 'w-64'
+      }`}>
         {/* Logo */}
-        <div className="p-5 border-b border-surface-600/50">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
+        <div className="px-4 py-3.5 border-b border-surface-600/50 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shrink-0">
               <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </div>
-            <div>
-              <h1 className="text-sm font-bold text-gray-100">Trading Play Book</h1>
+            <div className="min-w-0">
+              <h1 className="text-sm font-bold text-gray-100 truncate">Trading Play Book</h1>
               <p className="text-xs text-gray-500">Plan Profile</p>
             </div>
           </div>
+          {currentView !== 'journal' && (
+            <button
+              onClick={() => setAppNavOpen(false)}
+              className="w-6 h-6 flex items-center justify-center rounded text-gray-600 hover:text-gray-300 hover:bg-surface-600 transition-colors shrink-0 ml-2"
+              title="Hide navigation"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Navigation */}
@@ -182,11 +328,17 @@ function AppContent() {
             <NavButton key={item.id} item={item} currentView={currentView} onClick={setCurrentView} t={t} />
           ))}
 
+          {/* Journal */}
+          <SectionLabel labelKey="navJournal" t={t} />
+          {JOURNAL_NAV.map((item) => (
+            <NavButton key={item.id} item={item} currentView={currentView} onClick={setCurrentView} t={t} />
+          ))}
+
           {/* Settings */}
           <SectionLabel labelKey="navGeneral" t={t} />
           <div>
             <button
-              onClick={() => setCurrentView('settings')}
+              onClick={() => { setCurrentView('settings'); setSettingsSelected(null); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                 isSettings
                   ? 'bg-primary-600/20 text-primary-400 border border-primary-500/20'
@@ -234,90 +386,110 @@ function AppContent() {
       </aside>
 
       {/* ── Main Content ── */}
-      <main className="flex-1 overflow-y-auto">
-        {/* Header */}
-        <header className="sticky top-0 z-10 bg-surface-900/80 backdrop-blur-md border-b border-surface-600/30 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="page-title">{meta.title}</h2>
-              <p className="text-sm text-gray-500 mt-0.5">{meta.sub}</p>
+      {currentView === 'journal' ? (
+        <SessionJournalPage
+          navOpen={journalNavOpen}
+          onToggleNav={() => setJournalNavOpen(v => !v)}
+        />
+      ) : (
+        <main className="flex-1 overflow-y-auto">
+          {/* Header */}
+          <header className="sticky top-0 z-10 bg-surface-900/80 backdrop-blur-md border-b border-surface-600/30 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {!appNavOpen && (
+                  <button
+                    onClick={() => setAppNavOpen(true)}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-200 hover:bg-surface-700/60 transition-colors shrink-0"
+                    title="Show navigation"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                )}
+                <div>
+                  <h2 className="page-title">{meta.title}</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">{meta.sub}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Symbol selector — intraday views only, lives in header */}
+                {isIntraday && (
+                  <select
+                    value={selectedSymbol?.id || ''}
+                    onChange={(e) => {
+                      const sym = symbols.find((s) => s.id === Number(e.target.value));
+                      setSelectedSymbol(sym);
+                    }}
+                    className="input-field text-sm py-1.5 w-auto"
+                  >
+                    {symbols.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Date picker — planning only */}
+                {currentView === 'planning' && (
+                  <StyledDatePicker
+                    value={selectedDate}
+                    onChange={setSelectedDate}
+                    highlightDates={availableDates}
+                    placeholderText="Select date"
+                  />
+                )}
+
+                {/* Date dropdown — verdict only */}
+                {currentView === 'verdict' && (
+                  <select
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="input-field text-sm py-1.5 w-auto min-w-[150px]"
+                  >
+                    {availableDates.length === 0 && <option value="">No trading days</option>}
+                    {availableDates.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Save Day Plan button */}
+                {currentView === 'planning' && saveDayPlanFn && (
+                  <button
+                    onClick={saveDayPlanFn}
+                    disabled={savingDayPlan}
+                    className="btn-primary text-sm px-5 py-2 font-semibold"
+                  >
+                    {savingDayPlan ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Saving...
+                      </span>
+                    ) : 'Save Day Plan'}
+                  </button>
+                )}
+              </div>
             </div>
+          </header>
 
-            <div className="flex items-center gap-3">
-              {/* Symbol selector — intraday views only, lives in header */}
-              {isIntraday && (
-                <select
-                  value={selectedSymbol?.id || ''}
-                  onChange={(e) => {
-                    const sym = symbols.find((s) => s.id === Number(e.target.value));
-                    setSelectedSymbol(sym);
-                  }}
-                  className="input-field text-sm py-1.5 w-auto"
-                >
-                  {symbols.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              )}
-
-              {/* Date picker — planning only */}
-              {currentView === 'planning' && (
-                <StyledDatePicker
-                  value={selectedDate}
-                  onChange={setSelectedDate}
-                  highlightDates={availableDates}
-                  placeholderText="Select date"
-                />
-              )}
-
-              {/* Date dropdown — verdict only */}
-              {currentView === 'verdict' && (
-                <select
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="input-field text-sm py-1.5 w-auto min-w-[150px]"
-                >
-                  {availableDates.length === 0 && <option value="">No trading days</option>}
-                  {availableDates.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-              )}
-
-              {/* Save Day Plan button */}
-              {currentView === 'planning' && saveDayPlanFn && (
-                <button
-                  onClick={saveDayPlanFn}
-                  disabled={savingDayPlan}
-                  className="btn-primary text-sm px-5 py-2 font-semibold"
-                >
-                  {savingDayPlan ? (
-                    <span className="flex items-center gap-2">
-                      <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      Saving...
-                    </span>
-                  ) : 'Save Day Plan'}
-                </button>
-              )}
-            </div>
+          {/* View content */}
+          <div className="p-6">
+            {currentView === 'planning'       && <PlanningView />}
+            {currentView === 'verdict'        && <VerdictView />}
+            {currentView === 'gallery'        && <GalleryView />}
+            {currentView === 'swingPlans'     && <SwingPlansView />}
+            {currentView === 'swingGallery'   && <SwingGallery />}
+            {isSettings                       && <SettingsView selected={settingsSelected} onSelect={setSettingsSelected} />}
+            {currentView === 'reportIntraday' && <IntradayReport />}
+            {currentView === 'reportSwing'    && <SwingReport />}
           </div>
-        </header>
-
-        {/* View content */}
-        <div className="p-6">
-          {currentView === 'planning'       && <PlanningView />}
-          {currentView === 'verdict'        && <VerdictView />}
-          {currentView === 'gallery'        && <GalleryView />}
-          {currentView === 'swingPlans'     && <SwingPlansView />}
-          {currentView === 'swingGallery'   && <SwingGallery />}
-          {isSettings                       && <SettingsView selected={settingsSelected} />}
-          {currentView === 'reportIntraday' && <IntradayReport />}
-          {currentView === 'reportSwing'    && <SwingReport />}
-        </div>
-      </main>
+        </main>
+      )}
 
       {/* Notification — top-right quiet toast */}
       {notification && (
@@ -335,6 +507,9 @@ function AppContent() {
 
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
       {showGuide && <UserGuideModal onClose={() => setShowGuide(false)} />}
+      </div>
+
+      <StatusBar />
     </div>
   );
 }

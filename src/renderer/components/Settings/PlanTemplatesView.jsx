@@ -60,12 +60,22 @@ export default function PlanTemplatesView() {
   useEffect(() => { loadTemplates(); }, [loadTemplates]);
 
   const handleSaveTemplate = async (payload) => {
-    const fn = payload.id
-      ? () => window.api.planTemplate.update(payload.id, payload)
-      : () => window.api.planTemplate.create(payload);
+    const { pendingSrc, ...templatePayload } = payload;
+    const fn = templatePayload.id
+      ? () => window.api.planTemplate.update(templatePayload.id, templatePayload)
+      : () => window.api.planTemplate.create(templatePayload);
     const res = await fn();
     if (res.success) {
-      showNotification(payload.id ? 'Template updated' : 'Template created', 'success');
+      // For newly created templates, attach any pending screenshot right away
+      if (!templatePayload.id && pendingSrc && res.template?.id) {
+        const newId = res.template.id;
+        if (pendingSrc.type === 'file') {
+          await window.api.planTemplate.attachScreenshot(newId, pendingSrc.srcPath, pendingSrc.fileName);
+        } else if (pendingSrc.type === 'buffer') {
+          await window.api.planTemplate.attachScreenshotFromBuffer(newId, pendingSrc.buffer, pendingSrc.fileName);
+        }
+      }
+      showNotification(templatePayload.id ? 'Template updated' : 'Template created', 'success');
       setEditingTemplate(null);
       await loadTemplates();
     } else {
@@ -344,8 +354,69 @@ function TemplateCard({ template, onEdit, onClone, onArchive, onDelete, t }) {
   const tagColors = tag ? BEHAVIOR_TAGS[tag] : null;
   const biasColors = template.bias ? STOCK_PLAN_BIAS_COLORS[template.bias] : null;
 
+  const [screenshotPath, setScreenshotPath] = useState(template.screenshot_path || null);
+  const [uploading, setUploading]           = useState(false);
+
+  useEffect(() => { setScreenshotPath(template.screenshot_path || null); }, [template.screenshot_path]);
+
+  const doAttachFile = async (srcPath) => {
+    const fileName = `tpl_${template.id}_${Date.now()}_${srcPath.split(/[/\\]/).pop()}`;
+    const res = await window.api.planTemplate.attachScreenshot(template.id, srcPath, fileName);
+    if (res.success) {
+      const updated = await window.api.planTemplate.get(template.id);
+      setScreenshotPath(updated?.screenshot_path || null);
+    }
+  };
+
+  const doAttachBuffer = async (uint8Array, ext) => {
+    const fileName = `tpl_${template.id}_paste_${Date.now()}.${ext}`;
+    const res = await window.api.planTemplate.attachScreenshotFromBuffer(template.id, uint8Array, fileName);
+    if (res.success) {
+      const updated = await window.api.planTemplate.get(template.id);
+      setScreenshotPath(updated?.screenshot_path || null);
+    }
+  };
+
+  const handleAttach = async () => {
+    const filePaths = await window.api.dialog.openFile();
+    if (!filePaths || filePaths.length === 0) return;
+    setUploading(true);
+    try { await doAttachFile(filePaths[0]); } finally { setUploading(false); }
+  };
+
+  const handleRemove = async () => {
+    if (!window.confirm('Remove the reference chart?')) return;
+    setUploading(true);
+    try {
+      await window.api.planTemplate.removeScreenshot(template.id);
+      setScreenshotPath(null);
+    } finally { setUploading(false); }
+  };
+
+  const handlePaste = async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        if (screenshotPath && !window.confirm('Replace the existing reference chart?')) return;
+        const file = item.getAsFile();
+        if (!file) return;
+        const buf = new Uint8Array(await file.arrayBuffer());
+        const ext = item.type.split('/')[1] === 'jpeg' ? 'jpg' : item.type.split('/')[1];
+        setUploading(true);
+        try { await doAttachBuffer(buf, ext); } finally { setUploading(false); }
+        return;
+      }
+    }
+  };
+
   return (
-    <div className={`glass-card p-3 space-y-3 transition-opacity ${template.is_archived ? 'opacity-50' : ''}`}>
+    <div
+      className={`glass-card p-3 space-y-3 transition-opacity outline-none ${template.is_archived ? 'opacity-50' : ''}`}
+      tabIndex={0}
+      onPaste={handlePaste}
+    >
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
@@ -391,12 +462,56 @@ function TemplateCard({ template, onEdit, onClone, onArchive, onDelete, t }) {
         <p className="text-[11px] text-gray-500 line-clamp-2">{template.description}</p>
       )}
 
+      {/* Reference chart row */}
+      <div className="flex items-center justify-between py-1.5 px-2 rounded-md bg-surface-700/40 border border-surface-600/30">
+        <span className="text-[10px] text-gray-500 flex items-center gap-1">
+          <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Reference Chart
+        </span>
+        {uploading ? (
+          <span className="text-[10px] text-gray-500">…</span>
+        ) : screenshotPath ? (
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => window.api.image.openViewer(screenshotPath)}
+              className="text-[10px] text-teal-400 hover:text-teal-300 transition-colors"
+            >
+              View
+            </button>
+            <button
+              onClick={handleRemove}
+              className="text-[10px] text-red-500/60 hover:text-red-400 transition-colors"
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleAttach}
+            className="text-[10px] text-primary-400 hover:text-primary-300 transition-colors flex items-center gap-0.5"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Attach
+          </button>
+        )}
+      </div>
+
       {/* Footer actions */}
       <div className="flex items-center justify-between pt-2 border-t border-surface-600/30">
         <span className="text-[10px] text-gray-600">
           {template.usage_count} {t('usageCountLabel')}
         </span>
         <div className="flex items-center gap-2">
+          <ActionBtn onClick={() => window.api.planTemplate.openViewer(template)} title="View details">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </ActionBtn>
           <ActionBtn onClick={onClone} title={t('cloneTemplate')}>
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />

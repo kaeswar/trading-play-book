@@ -12,7 +12,7 @@ import StyledDatePicker from '../shared/StyledDatePicker';
 // Opens after a template is picked from the Plan Store.
 // Collects swing-specific instance fields + optional setup screenshots, then creates the swing_plan row.
 export default function SwingPlanInstanceForm({ template, onSaved, onClose }) {
-  const { symbols, showNotification } = useApp();
+  const { symbols, showNotification, loadSymbols } = useApp();
   const { t } = useLanguage();
   const { createFromTemplate, addScreenshotFromBuffer } = useSwingPlan();
   const fileInputRef = useRef(null);
@@ -28,9 +28,36 @@ export default function SwingPlanInstanceForm({ template, onSaved, onClose }) {
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState('');
 
+  const [showNewSymbol, setShowNewSymbol]   = useState(false);
+  const [newSymbolName, setNewSymbolName]   = useState('');
+  const [newSymbolSaving, setNewSymbolSaving] = useState(false);
+  const newSymbolInputRef = useRef(null);
+
   useEffect(() => {
     if (!symbolId && symbols.length > 0) setSymbolId(symbols[0].id);
   }, [symbols, symbolId]);
+
+  useEffect(() => {
+    if (showNewSymbol && newSymbolInputRef.current) newSymbolInputRef.current.focus();
+  }, [showNewSymbol]);
+
+  const handleCreateSymbol = async () => {
+    const name = newSymbolName.trim().toUpperCase();
+    if (!name) return;
+    setNewSymbolSaving(true);
+    try {
+      const created = await window.api.symbol.create(name);
+      if (!created?.id) throw new Error('Failed to create symbol');
+      await loadSymbols();
+      setSymbolId(created.id);
+      setShowNewSymbol(false);
+      setNewSymbolName('');
+    } catch (err) {
+      setError(err.message || 'Failed to create symbol');
+    } finally {
+      setNewSymbolSaving(false);
+    }
+  };
 
   if (!template) return null;
 
@@ -108,6 +135,18 @@ export default function SwingPlanInstanceForm({ template, onSaved, onClose }) {
             <p className="text-[10px] text-gray-500 uppercase tracking-wider">Template</p>
             <div className="flex items-center gap-2 flex-wrap mt-0.5">
               <h2 className="text-base font-semibold text-gray-200 truncate">{template.name}</h2>
+              {(template.screenshot_path || template.description) && (
+                <button
+                  type="button"
+                  onClick={() => window.api.planTemplate.openViewer(template)}
+                  title="View template reference"
+                  className="flex-shrink-0 text-teal-400 hover:text-teal-300 transition-colors p-0.5 rounded"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </button>
+              )}
               {biasColors && (
                 <span className={`text-[10px] px-2 py-0.5 rounded ${biasColors.bg} ${biasColors.text} ${biasColors.border} border`}>
                   {template.bias}
@@ -136,16 +175,63 @@ export default function SwingPlanInstanceForm({ template, onSaved, onClose }) {
           {/* Symbol + Plan Date */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <Label>Symbol *</Label>
-              <select
-                value={symbolId}
-                onChange={(e) => setSymbolId(e.target.value)}
-                className="input-field text-sm w-full"
-              >
-                {symbols.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Symbol *</span>
+                {!showNewSymbol && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowNewSymbol(true); setError(''); }}
+                    className="text-[11px] text-primary-400 hover:text-primary-300 flex items-center gap-0.5 transition-colors"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    New
+                  </button>
+                )}
+              </div>
+              {showNewSymbol ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    ref={newSymbolInputRef}
+                    type="text"
+                    value={newSymbolName}
+                    onChange={(e) => setNewSymbolName(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleCreateSymbol();
+                      if (e.key === 'Escape') { setShowNewSymbol(false); setNewSymbolName(''); }
+                    }}
+                    placeholder="SYMBOL"
+                    maxLength={20}
+                    className="input-field text-sm flex-1 uppercase"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateSymbol}
+                    disabled={newSymbolSaving || !newSymbolName.trim()}
+                    className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-primary-600 hover:bg-primary-500 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                  >
+                    {newSymbolSaving ? '…' : 'Add'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowNewSymbol(false); setNewSymbolName(''); }}
+                    className="text-xs text-gray-500 hover:text-gray-300 transition-colors shrink-0"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={symbolId}
+                  onChange={(e) => setSymbolId(e.target.value)}
+                  className="input-field text-sm w-full"
+                >
+                  {symbols.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
             <div>
               <Label>Plan Date *</Label>

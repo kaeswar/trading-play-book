@@ -69,6 +69,21 @@ module.exports = {
     return this.getById(id);
   },
 
+  // All day plans for a given template, joined with trading_day + symbol for export.
+  getByTemplateId(templateId) {
+    return getDb().prepare(`
+      SELECT dp.*,
+             td.trade_date AS plan_date,
+             s.id          AS symbol_id,
+             s.name        AS symbol_name
+      FROM day_plan dp
+      JOIN trading_day td ON dp.trading_day_id = td.id
+      JOIN symbol s       ON td.symbol_id = s.id
+      WHERE dp.template_id = ?
+      ORDER BY td.trade_date DESC
+    `).all(templateId);
+  },
+
   delete(id) {
     return getDb().prepare('DELETE FROM day_plan WHERE id = ?').run(id);
   },

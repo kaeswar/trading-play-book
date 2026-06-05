@@ -48,21 +48,21 @@ Go to the [**Releases**](../../releases/latest) page and download one of:
 
 | File | When to use |
 |------|-------------|
-| `Trading Play Book Setup 1.4.0.exe` | **Recommended** — installs the app, creates Start Menu & Desktop shortcuts |
-| `Trading Play Book 1.4.0.exe` | **Portable** — run directly without installing, no admin rights needed |
+| `Trading Play Book Setup 2.0.0.exe` | **Recommended** — installs the app, creates Start Menu & Desktop shortcuts |
+| `Trading Play Book 2.0.0.exe` | **Portable** — run directly without installing, no admin rights needed |
 
 ---
 
 ## Installation
 
 ### Installer (recommended)
-1. Download `Trading Play Book Setup 1.4.0.exe`
+1. Download `Trading Play Book Setup 2.0.0.exe`
 2. Run the installer — Windows may show a SmartScreen warning (see note below)
 3. Choose your install folder (default: `C:\Program Files\Trading Play Book`)
 4. Launch from the Desktop shortcut or Start Menu
 
 ### Portable
-1. Download `Trading Play Book 1.4.0.exe`
+1. Download `Trading Play Book 2.0.0.exe`
 2. Place it in any folder you prefer
 3. Double-click to run — no installation needed
 
@@ -86,7 +86,7 @@ Screenshots you attach are stored at their **original location** on your drive �
 
 ---
 
-## Features — v1.4
+## Features — v2.0
 
 - **Template Library** — Create reusable plan templates (Market Profile Openings, custom strategies) grouped by category; clone, archive, and manage them in Settings
 - **Pre-Market Planning** — Pick templates for the day, set target/stop, attach a setup chart screenshot; cards collapse by default with Expand All / Shrink All
@@ -100,6 +100,12 @@ Screenshots you attach are stored at their **original location** on your drive �
 ---
 
 ## Release History
+
+### v2.0.0
+- **Session Journal** — Full Market Profile / TPO session journaling with multi-panel layout (Sessions, TPO Sequence, Entry Detail); collapsible panels with arrow-button toggles
+- **Status Bar** — Persistent app-wide status bar showing current view, active instrument/symbol, selected TPO period, settings section, and app version
+- **Plan Templates** — Reusable plan template library with category grouping, clone, and archive support
+- **Dhan API Integration** — Broker integration support via Dhan API
 
 ### v1.4.0
 - **Screenshot system overhaul** — one screenshot per plan (setup + outcome) enforced at UI, dialog, and DB levels

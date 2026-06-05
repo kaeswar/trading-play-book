@@ -512,17 +512,51 @@ async function exportSwingToPDF(swingData, filePath) {
 // File name supplied by the caller (sanitised plan name).
 
 function buildPlanWiseExportData({ templateId, symbolIds }) {
-  let plans = swingPlanRepo.search({ templateId });
+  // Swing plans
+  let swingPlans = swingPlanRepo.search({ templateId });
   if (Array.isArray(symbolIds) && symbolIds.length > 0) {
-    plans = plans.filter((p) => symbolIds.includes(p.symbol_id));
+    swingPlans = swingPlans.filter((p) => symbolIds.includes(p.symbol_id));
   }
+
+  // Intraday day plans
+  let dayPlans = dayPlanRepo.getByTemplateId(templateId);
+  if (Array.isArray(symbolIds) && symbolIds.length > 0) {
+    dayPlans = dayPlans.filter((dp) => symbolIds.includes(dp.symbol_id));
+  }
+
+  // Normalize to a common shape for exportPlanWiseToCSV
+  const plans = [
+    ...swingPlans.map((p) => ({
+      plan_date:        p.plan_date,
+      symbol_name:      p.symbol_name,
+      symbol_id:        p.symbol_id,
+      bias:             p.bias,
+      target_price:     p.target_price,
+      stop_loss:        p.stop_loss,
+      execution_status: p.execution_status,
+      name:             p.name,
+      trade_type:       'Swing',
+    })),
+    ...dayPlans.map((dp) => ({
+      plan_date:        dp.plan_date,
+      symbol_name:      dp.symbol_name,
+      symbol_id:        dp.symbol_id,
+      bias:             dp.bias,
+      target_price:     dp.target ?? null,
+      stop_loss:        dp.stop_out ?? null,
+      execution_status: dp.execution_status,
+      name:             dp.name,
+      trade_type:       'Intraday',
+    })),
+  ];
+
   const planName = plans.length > 0 ? plans[0].name : `plan_${templateId}`;
   return { plans, planName };
 }
 
 function exportPlanWiseToCSV({ plans }, filePath) {
   const lines = [];
-  lines.push(['Date', 'Symbol', 'Bias', 'Target', 'Stop', 'Execution Status'].map(csvEsc).join(','));
+  lines.push(['Date', 'Symbol', 'Type', 'Bias', 'Target', 'Stop', 'Execution Status'].map(csvEsc).join(','));
 
   const sorted = [...plans].sort((a, b) => {
     if (a.plan_date !== b.plan_date) return a.plan_date < b.plan_date ? -1 : 1;
@@ -533,6 +567,7 @@ function exportPlanWiseToCSV({ plans }, filePath) {
     lines.push([
       p.plan_date,
       p.symbol_name,
+      p.trade_type || '',
       p.bias,
       p.target_price ?? '',
       p.stop_loss ?? '',

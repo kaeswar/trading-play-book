@@ -1,6 +1,6 @@
 {
   "name": "trading-journal",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "description": "Trading Play Book — A disciplined pre/post market trading journal",
   "author": {
     "name": "Kaeswar",
@@ -22,7 +22,9 @@
     "react": "^18.3.1",
     "react-datepicker": "^9.1.0",
     "react-dom": "^18.3.1",
-    "recharts": "^3.8.0"
+    "react-is": "^19.2.7",
+    "recharts": "^3.8.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.4",

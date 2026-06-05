@@ -7,7 +7,7 @@ const INTRADAY_MODES = [
   { id: 'multiSymbol', label: 'Multi-Symbol' },
 ];
 
-const SWING_STATUSES = ['Waiting', 'Successful', 'Failed', 'Cancelled', 'Cost-to-Cost', 'UnPlanned'];
+const SWING_STATUSES = ['Waiting', 'Successful', 'Failed', 'Cancelled', 'Cost-to-Cost', 'UnPlanned', 'In-Active'];
 
 function buildPwFileName(templates, templateId) {
   const now  = new Date();
@@ -137,14 +137,23 @@ export default function ExportView() {
     });
   }, []);
 
-  useEffect(() => {
+  const loadPwTemplates = () => {
     if (typeof window.api.swingPlan.getDistinctTemplates !== 'function') return;
     window.api.swingPlan.getDistinctTemplates().then((rows) => {
       const list = rows || [];
       setPwTemplates(list);
-      if (list.length > 0) setPwTemplateId(String(list[0].id));
+      setPwTemplateId((current) => {
+        if (list.length === 0) return '';
+        const stillValid = list.some((t) => String(t.id) === current);
+        return stillValid ? current : String(list[0].id);
+      });
     });
-  }, []);
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'planWise') return;
+    loadPwTemplates();
+  }, [activeTab]);
 
   useEffect(() => {
     if (!pwTemplateId) return;
@@ -539,7 +548,10 @@ export default function ExportView() {
           <div className="space-y-4">
             <div className="glass-card p-4 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">Plan (Template)</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Plan (Template)</label>
+                  <button onClick={loadPwTemplates} className="text-xs text-primary-400 hover:text-primary-300 transition-colors">Refresh</button>
+                </div>
                 {pwTemplates.length === 0 ? (
                   <p className="text-xs text-gray-500 py-2">No plans with instances yet. Create swing plans first.</p>
                 ) : (
@@ -612,7 +624,7 @@ export default function ExportView() {
             <div className="glass-card p-4 space-y-2">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">CSV Columns</p>
               <div className="flex flex-wrap gap-1.5 pt-1">
-                {['Date', 'Symbol', 'Bias', 'Target', 'Stop', 'Execution Status'].map((col) => (
+                {['Date', 'Symbol', 'Type', 'Bias', 'Target', 'Stop', 'Execution Status'].map((col) => (
                   <span key={col} className="text-[11px] px-2 py-0.5 rounded bg-surface-700 border border-surface-600 text-gray-400">{col}</span>
                 ))}
               </div>

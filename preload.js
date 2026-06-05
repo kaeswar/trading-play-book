@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('api', {
     getActive: () => ipcRenderer.invoke('symbol:getActive'),
     create: (name) => ipcRenderer.invoke('symbol:create', name),
     setInactive: (id) => ipcRenderer.invoke('symbol:setInactive', id),
+    rename: (id, name) => ipcRenderer.invoke('symbol:rename', id, name),
+    updateDhanConfig: (id, cfg) => ipcRenderer.invoke('symbol:updateDhanConfig', id, cfg),
   },
 
   // Trading Day
@@ -48,6 +50,42 @@ contextBridge.exposeInMainWorld('api', {
   query: {
     getFilteredDays: (filters) => ipcRenderer.invoke('query:getFilteredDays', filters),
     getMetrics: (symbolId) => ipcRenderer.invoke('query:getMetrics', symbolId),
+  },
+
+  // Session Journal (Market Profile)
+  journal: {
+    createSession:         (data)                      => ipcRenderer.invoke('journal:createSession', data),
+    getSessions:           ()                          => ipcRenderer.invoke('journal:getSessions'),
+    getSession:            (id)                        => ipcRenderer.invoke('journal:getSession', id),
+    saveEntry:             (id, data)                  => ipcRenderer.invoke('journal:saveEntry', id, data),
+    insertStructureEvent:  (sessionId, afterSortOrder) => ipcRenderer.invoke('journal:insertStructureEvent', sessionId, afterSortOrder),
+    deleteEntry:           (id)                        => ipcRenderer.invoke('journal:deleteEntry', id),
+    deleteSession:         (id)                        => ipcRenderer.invoke('journal:deleteSession', id),
+    getPresessionData:     ()                          => ipcRenderer.invoke('journal:getPresessionData'),
+    fetchTpoOhlc:          (params)                    => ipcRenderer.invoke('journal:fetchTpoOhlc', params),
+    exportMarkdown:        (content, defaultFilename)  => ipcRenderer.invoke('journal:exportMarkdown', { content, defaultFilename }),
+  },
+
+  // Broker Integration
+  broker: {
+    getConfig:      ()    => ipcRenderer.invoke('broker:getConfig'),
+    setConfig:      (cfg) => ipcRenderer.invoke('broker:setConfig', cfg),
+    testConnection: ()    => ipcRenderer.invoke('broker:testConnection'),
+  },
+
+  // Day-Level Intraday Note (per trading_day, not scoped to a plan)
+  dayIntradayNote: {
+    getByTradingDay: (tradingDayId) => ipcRenderer.invoke('dayIntradayNote:getByTradingDay', tradingDayId),
+    count:           (tradingDayId) => ipcRenderer.invoke('dayIntradayNote:count', tradingDayId),
+    create:          (data)         => ipcRenderer.invoke('dayIntradayNote:create', data),
+    update:          (id, data)     => ipcRenderer.invoke('dayIntradayNote:update', id, data),
+    delete:          (id)           => ipcRenderer.invoke('dayIntradayNote:delete', id),
+  },
+
+  dayIntradayNoteScreenshot: {
+    getByNote: (noteId) => ipcRenderer.invoke('dayIntradayNoteScreenshot:getByNote', noteId),
+    create:    (data)   => ipcRenderer.invoke('dayIntradayNoteScreenshot:create', data),
+    delete:    (id)     => ipcRenderer.invoke('dayIntradayNoteScreenshot:delete', id),
   },
 
   // Intraday Note (per day_plan)
@@ -126,6 +164,10 @@ contextBridge.exposeInMainWorld('api', {
     archive: (id, archived)   => ipcRenderer.invoke('planTemplate:archive', id, !!archived),
     delete:  (id)             => ipcRenderer.invoke('planTemplate:delete', id),
     clone:   (id, name)       => ipcRenderer.invoke('planTemplate:clone', id, name || null),
+    attachScreenshot:           (id, srcPath, fileName) => ipcRenderer.invoke('planTemplate:attachScreenshot', id, srcPath, fileName),
+    attachScreenshotFromBuffer: (id, uint8Array, fileName) => ipcRenderer.invoke('planTemplate:attachScreenshotFromBuffer', id, uint8Array, fileName),
+    removeScreenshot:           (id)                    => ipcRenderer.invoke('planTemplate:removeScreenshot', id),
+    openViewer: (templateData) => ipcRenderer.invoke('planTemplate:openViewer', templateData),
   },
 
   // Day Plan (instance picked for a day from a template)

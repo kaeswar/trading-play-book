@@ -21,4 +21,24 @@ module.exports = {
   setInactive(id) {
     return getDb().prepare('UPDATE symbol SET is_active = 0 WHERE id = ?').run(id);
   },
+
+  rename(id, name) {
+    const db = getDb();
+    const current = db.prepare('SELECT name FROM symbol WHERE id = ?').get(id);
+    if (current) {
+      db.prepare('UPDATE sessions SET instrument = ? WHERE instrument = ?').run(name, current.name);
+    }
+    db.prepare('UPDATE symbol SET name = ? WHERE id = ?').run(name, id);
+    return this.getById(id);
+  },
+
+  getByName(name) {
+    return getDb().prepare('SELECT * FROM symbol WHERE name = ?').get(name);
+  },
+
+  updateDhanConfig(id, { dhan_security_id, dhan_exchange_segment, dhan_instrument_type }) {
+    getDb().prepare(`UPDATE symbol SET dhan_security_id=?, dhan_exchange_segment=?, dhan_instrument_type=? WHERE id=?`)
+      .run(dhan_security_id ?? null, dhan_exchange_segment ?? null, dhan_instrument_type ?? null, id);
+    return this.getById(id);
+  },
 };

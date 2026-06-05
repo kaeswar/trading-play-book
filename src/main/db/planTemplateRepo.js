@@ -162,4 +162,18 @@ module.exports = {
     ).run(id);
     return this.getById(id);
   },
+
+  attachScreenshot(id, filePath) {
+    getDb().prepare(
+      'UPDATE plan_template SET screenshot_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).run(filePath, id);
+    return this.getById(id);
+  },
+
+  removeScreenshot(id) {
+    getDb().prepare(
+      'UPDATE plan_template SET screenshot_path = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).run(id);
+    return this.getById(id);
+  },
 };

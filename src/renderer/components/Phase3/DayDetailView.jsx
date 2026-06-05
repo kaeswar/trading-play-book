@@ -6,6 +6,7 @@ import {
   formatDate, deriveBehaviorTag,
 } from '../../../shared/constants';
 import PlanFullViewModal from '../shared/PlanFullViewModal';
+import DayIntradayNotesModal from '../shared/DayIntradayNotesModal';
 
 export default function DayDetailView({ tradingDayId, dayIds = [], onBack, onNavigate }) {
   const { showNotification, selectedSymbol } = useApp();
@@ -17,16 +18,20 @@ export default function DayDetailView({ tradingDayId, dayIds = [], onBack, onNav
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting]       = useState(false);
   const [openModal, setOpenModal]     = useState(null);   // dayPlan
+  const [dayNotesOpen, setDayNotesOpen] = useState(false);
+  const [dayNoteCount, setDayNoteCount] = useState(0);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
       const td = await window.api.tradingDay.getById(tradingDayId);
       setTradingDay(td);
-      const [plans, counts] = await Promise.all([
+      const [plans, counts, dayCount] = await Promise.all([
         getByTradingDay(tradingDayId),
         window.api.intradayNote.countByTradingDay(tradingDayId),
+        window.api.dayIntradayNote.count(tradingDayId),
       ]);
+      setDayNoteCount(dayCount || 0);
       const plansWithShots = [];
       for (const p of plans) {
         const ss = await getScreenshots(p.id);
@@ -75,12 +80,13 @@ export default function DayDetailView({ tradingDayId, dayIds = [], onBack, onNav
   const prevId = currentIndex > 0 ? dayIds[currentIndex - 1] : null;
   const nextId = currentIndex >= 0 && currentIndex < dayIds.length - 1 ? dayIds[currentIndex + 1] : null;
 
-  const successCount  = dayPlans.filter(p => p.execution_status === 'Successful').length;
-  const failedCount   = dayPlans.filter(p => p.execution_status === 'Failed').length;
-  const c2cCount      = dayPlans.filter(p => p.execution_status === 'Cost-to-Cost').length;
+  const successCount   = dayPlans.filter(p => p.execution_status === 'Successful').length;
+  const failedCount    = dayPlans.filter(p => p.execution_status === 'Failed').length;
+  const c2cCount       = dayPlans.filter(p => p.execution_status === 'Cost-to-Cost').length;
   const unplannedCount = dayPlans.filter(p => p.execution_status === 'UnPlanned').length;
   const cancelledCount = dayPlans.filter(p => p.execution_status === 'Cancelled').length;
-  const waitingCount  = dayPlans.filter(p => !p.execution_status || p.execution_status === 'Waiting').length;
+  const inactiveCount  = dayPlans.filter(p => p.execution_status === 'In-Active').length;
+  const waitingCount   = dayPlans.filter(p => !p.execution_status || p.execution_status === 'Waiting').length;
 
   return (
     <div className="space-y-5">
@@ -116,7 +122,23 @@ export default function DayDetailView({ tradingDayId, dayIds = [], onBack, onNav
             {c2cCount > 0 && <Stat label="Cost-to-Cost" value={c2cCount} color="amber" />}
             {unplannedCount > 0 && <Stat label="UnPlanned" value={unplannedCount} color="violet" />}
             {cancelledCount > 0 && <Stat label="Cancelled" value={cancelledCount} color="gray" />}
+            {inactiveCount > 0 && <Stat label="In-Active" value={inactiveCount} color="slate" />}
             {waitingCount > 0 && <Stat label="Waiting" value={waitingCount} color="gray" />}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDayNotesOpen(true)}
+              className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium transition-colors flex items-center gap-1.5 ${
+                dayNoteCount > 0
+                  ? 'bg-sky-500/20 border-sky-500/50 text-sky-300 hover:bg-sky-500/30'
+                  : 'bg-surface-700/60 border-surface-500/60 text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              {dayNoteCount > 0 ? `Day Notes (${dayNoteCount})` : 'Day Notes'}
+            </button>
           </div>
           {!confirmDelete ? (
             <button onClick={() => setConfirmDelete(true)} className="text-xs text-gray-500 hover:text-red-400 flex items-center gap-1 px-2 py-1 rounded hover:bg-red-500/10 transition-colors">
@@ -164,6 +186,15 @@ export default function DayDetailView({ tradingDayId, dayIds = [], onBack, onNav
           onClose={() => { setOpenModal(null); loadAll(); }}
         />
       )}
+
+      {dayNotesOpen && tradingDay && (
+        <DayIntradayNotesModal
+          tradingDay={tradingDay}
+          symbolName={tradingDay.symbol_name}
+          date={tradingDay.trade_date}
+          onClose={() => { setDayNotesOpen(false); loadAll(); }}
+        />
+      )}
     </div>
   );
 }
@@ -174,6 +205,7 @@ function Stat({ label, value, color = 'gray' }) {
     red:     'text-red-400',
     amber:   'text-amber-400',
     violet:  'text-violet-300',
+    slate:   'text-slate-400',
     gray:    'text-gray-300',
   };
   return (

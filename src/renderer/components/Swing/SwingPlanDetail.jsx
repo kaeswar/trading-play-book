@@ -208,6 +208,25 @@ export default function SwingPlanDetail({ planId, onBack }) {
             <p className="text-[10px] text-gray-500 uppercase tracking-wider">From Template</p>
             <div className="flex items-center gap-2 flex-wrap mt-0.5">
               <h2 className="text-base font-semibold text-gray-200 truncate">{plan.name}</h2>
+              {(plan.template_screenshot_path || plan.description) && (
+                <button
+                  type="button"
+                  onClick={() => window.api.planTemplate.openViewer({
+                    name:            plan.name,
+                    bias:            plan.bias,
+                    behavior_tag:    plan.behavior_tag,
+                    group_name:      plan.group_name,
+                    description:     plan.description,
+                    screenshot_path: plan.template_screenshot_path,
+                  })}
+                  title="View template reference"
+                  className="flex-shrink-0 text-teal-400 hover:text-teal-300 transition-colors p-0.5 rounded"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </button>
+              )}
               {biasColors && (
                 <span className={`text-[10px] px-2 py-0.5 rounded ${biasColors.bg} ${biasColors.text} ${biasColors.border} border`}>
                   {plan.bias}

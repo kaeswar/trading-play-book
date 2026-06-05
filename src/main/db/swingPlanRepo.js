@@ -1,10 +1,11 @@
 const { getDb } = require('./database');
 const planTemplateRepo = require('./planTemplateRepo');
 
-// Joins symbol name so the UI can show it without an extra query.
+// Joins symbol name and template screenshot so the UI can show them without extra queries.
 const SELECT_COLS = `
   sp.*,
-  s.name AS symbol_name
+  s.name AS symbol_name,
+  pt.screenshot_path AS template_screenshot_path
 `;
 
 module.exports = {
@@ -14,6 +15,7 @@ module.exports = {
       SELECT ${SELECT_COLS}
       FROM swing_plan sp
       JOIN symbol s ON sp.symbol_id = s.id
+      LEFT JOIN plan_template pt ON sp.template_id = pt.id
       WHERE 1=1
     `;
     const params = [];
@@ -74,6 +76,7 @@ module.exports = {
       SELECT ${SELECT_COLS}
       FROM swing_plan sp
       JOIN symbol s ON sp.symbol_id = s.id
+      LEFT JOIN plan_template pt ON sp.template_id = pt.id
       WHERE sp.id = ?
     `).get(id);
   },
@@ -151,29 +154,38 @@ module.exports = {
       SELECT DISTINCT s.id, s.name
       FROM swing_plan sp
       JOIN symbol s ON sp.symbol_id = s.id
+      LEFT JOIN plan_template pt ON sp.template_id = pt.id
       ORDER BY s.name COLLATE NOCASE ASC
     `).all();
   },
 
-  // Templates that have at least one swing_plan instance — used by Plan Wise export dropdown.
+  // Templates that have at least one swing_plan OR day_plan instance — used by Plan Wise export dropdown.
   getDistinctTemplates() {
     return getDb().prepare(`
-      SELECT DISTINCT sp.template_id AS id, sp.name, sp.group_name,
-             COUNT(*) AS plan_count
-      FROM swing_plan sp
-      GROUP BY sp.template_id, sp.name, sp.group_name
-      ORDER BY sp.name COLLATE NOCASE ASC
+      SELECT template_id AS id, name, group_name, COUNT(*) AS plan_count
+      FROM (
+        SELECT sp.template_id, sp.name, sp.group_name FROM swing_plan sp WHERE sp.template_id IS NOT NULL
+        UNION ALL
+        SELECT dp.template_id, dp.name, dp.group_name FROM day_plan dp WHERE dp.template_id IS NOT NULL
+      )
+      GROUP BY template_id, name, group_name
+      ORDER BY name COLLATE NOCASE ASC
     `).all();
   },
 
-  // Distinct symbols that have at least one swing_plan for a specific template — used by Plan Wise export.
+  // Distinct symbols for a template across both swing_plan and day_plan — used by Plan Wise export.
   getDistinctSymbolsByTemplate(templateId) {
     return getDb().prepare(`
       SELECT DISTINCT s.id, s.name
-      FROM swing_plan sp
-      JOIN symbol s ON sp.symbol_id = s.id
-      WHERE sp.template_id = ?
+      FROM (
+        SELECT sp.symbol_id FROM swing_plan sp WHERE sp.template_id = ?
+        UNION
+        SELECT td.symbol_id FROM day_plan dp
+        JOIN trading_day td ON dp.trading_day_id = td.id
+        WHERE dp.template_id = ?
+      ) t
+      JOIN symbol s ON t.symbol_id = s.id
       ORDER BY s.name COLLATE NOCASE ASC
-    `).all(templateId);
+    `).all(templateId, templateId);
   },
 };

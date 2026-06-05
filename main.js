@@ -9,12 +9,16 @@ const swingPlanRepo = require('./src/main/db/swingPlanRepo');
 const swingPlanScreenshotRepo = require('./src/main/db/swingPlanScreenshotRepo');
 const intradayNoteRepo = require('./src/main/db/intradayNoteRepo');
 const intradayNoteScreenshotRepo = require('./src/main/db/intradayNoteScreenshotRepo');
+const dayIntradayNoteRepo = require('./src/main/db/dayIntradayNoteRepo');
+const dayIntradayNoteScreenshotRepo = require('./src/main/db/dayIntradayNoteScreenshotRepo');
+const journalRepo = require('./src/main/db/journalRepo');
 const planGroupRepo = require('./src/main/db/planGroupRepo');
 const planTemplateRepo = require('./src/main/db/planTemplateRepo');
 const dayPlanRepo = require('./src/main/db/dayPlanRepo');
 const dayPlanScreenshotRepo = require('./src/main/db/dayPlanScreenshotRepo');
 const planningService = require('./src/main/services/PlanningService');
 const exportService = require('./src/main/services/ExportService');
+const marketProfileExcelService = require('./src/main/services/MarketProfileExcelService');
 const backupService = require('./src/main/services/BackupService');
 
 let mainWindow;
@@ -150,6 +154,7 @@ function registerIpcHandlers() {
   ipcMain.handle('symbol:getActive', () => symbolRepo.getActive());
   ipcMain.handle('symbol:create', (_, name) => symbolRepo.create(name));
   ipcMain.handle('symbol:setInactive', (_, id) => symbolRepo.setInactive(id));
+  ipcMain.handle('symbol:rename', (_, id, name) => symbolRepo.rename(id, name));
 
   // --- Trading Day handlers ---
   ipcMain.handle('tradingDay:getById', (_, id) => tradingDayRepo.getById(id));
@@ -194,16 +199,17 @@ function registerIpcHandlers() {
 
   // --- Image file handlers ---
   ipcMain.handle('image:import', async (_, sourcePath, symbolName, date, fileName) => {
-    const imagesDir = getImagesDir();
-    const symbolDir = path.join(imagesDir, symbolName, date);
-    if (!fs.existsSync(symbolDir)) fs.mkdirSync(symbolDir, { recursive: true });
-
-    const destPath = path.join(symbolDir, fileName);
-    fs.copyFileSync(sourcePath, destPath);
-
-    // Return relative path from userData
-    const relativePath = path.relative(app.getPath('userData'), destPath);
-    return relativePath;
+    try {
+      const imagesDir = getImagesDir();
+      const symbolDir = path.join(imagesDir, symbolName || '_unknown', date || '_nodate');
+      if (!fs.existsSync(symbolDir)) fs.mkdirSync(symbolDir, { recursive: true });
+      const destPath = path.join(symbolDir, fileName);
+      fs.copyFileSync(sourcePath, destPath);
+      return path.relative(app.getPath('userData'), destPath);
+    } catch (err) {
+      console.error('[image:import] failed:', err);
+      throw err;
+    }
   });
 
   ipcMain.handle('image:getFullPath', (_, relativePath) => {
@@ -223,12 +229,18 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('image:saveBuffer', (_, uint8Array, symbolName, date, fileName) => {
-    const imagesDir = getImagesDir();
-    const dir = path.join(imagesDir, symbolName, date);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    const destPath = path.join(dir, fileName);
-    fs.writeFileSync(destPath, Buffer.from(uint8Array));
-    return path.relative(app.getPath('userData'), destPath);
+    try {
+      const imagesDir = getImagesDir();
+      const dir = path.join(imagesDir, symbolName || '_unknown', date || '_nodate');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const destPath = path.join(dir, fileName);
+      const buf = uint8Array instanceof Buffer ? uint8Array : Buffer.from(uint8Array);
+      fs.writeFileSync(destPath, buf);
+      return path.relative(app.getPath('userData'), destPath);
+    } catch (err) {
+      console.error('[image:saveBuffer] failed:', err);
+      throw err;
+    }
   });
 
   ipcMain.handle('image:openExternal', async (_, relativePath) => {
@@ -364,6 +376,80 @@ function registerIpcHandlers() {
   ipcMain.handle('intradayNoteScreenshot:delete', (_, id) =>
     intradayNoteScreenshotRepo.delete(id)
   );
+
+  // --- Day-Level Intraday Note handlers ---
+  ipcMain.handle('dayIntradayNote:getByTradingDay', (_, tradingDayId) =>
+    dayIntradayNoteRepo.getByTradingDay(tradingDayId)
+  );
+  ipcMain.handle('dayIntradayNote:count', (_, tradingDayId) =>
+    dayIntradayNoteRepo.count(tradingDayId)
+  );
+  ipcMain.handle('dayIntradayNote:create', (_, data) => dayIntradayNoteRepo.create(data));
+  ipcMain.handle('dayIntradayNote:update', (_, id, data) => dayIntradayNoteRepo.update(id, data));
+  ipcMain.handle('dayIntradayNote:delete', (_, id) => {
+    dayIntradayNoteScreenshotRepo.deleteByNote(id);
+    return dayIntradayNoteRepo.delete(id);
+  });
+
+  // --- Day Intraday Note Screenshot handlers ---
+  ipcMain.handle('dayIntradayNoteScreenshot:getByNote', (_, noteId) =>
+    dayIntradayNoteScreenshotRepo.getByNote(noteId)
+  );
+  ipcMain.handle('dayIntradayNoteScreenshot:create', (_, data) =>
+    dayIntradayNoteScreenshotRepo.create(data)
+  );
+  ipcMain.handle('dayIntradayNoteScreenshot:delete', (_, id) =>
+    dayIntradayNoteScreenshotRepo.delete(id)
+  );
+
+  // --- Session Journal handlers ---
+  ipcMain.handle('journal:createSession',        (_, data)                     => journalRepo.createSession(data));
+  ipcMain.handle('journal:getSessions',          ()                            => journalRepo.getSessions());
+  ipcMain.handle('journal:getSession',           (_, id)                       => journalRepo.getSession(id));
+  ipcMain.handle('journal:saveEntry',            (_, id, data)                 => journalRepo.saveEntry(id, data));
+  ipcMain.handle('journal:insertStructureEvent', (_, sessionId, afterSortOrder) => journalRepo.insertStructureEvent(sessionId, afterSortOrder));
+  ipcMain.handle('journal:deleteEntry',          (_, id)                       => journalRepo.deleteEntry(id));
+  ipcMain.handle('journal:deleteSession',        (_, id)                       => journalRepo.deleteSession(id));
+  ipcMain.handle('journal:getPresessionData',    ()                            => marketProfileExcelService.getPresessionData());
+
+  ipcMain.handle('journal:exportMarkdown', async (_, { content, defaultFilename }) => {
+    try {
+      const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Save Whole Day Narrative',
+        defaultPath: defaultFilename,
+        filters: [{ name: 'Markdown Files', extensions: ['md'] }],
+      });
+      if (canceled || !filePath) return { success: false, canceled: true };
+      fs.writeFileSync(filePath, content, 'utf8');
+      return { success: true, filePath };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // --- Dhan OHLC fetch handler ---
+  const dhanService = require('./src/main/services/DhanService');
+  ipcMain.handle('journal:fetchTpoOhlc', async (_, { date, time_from, time_to, instrument }) => {
+    const settingsRepoLocal = require('./src/main/db/settingsRepo');
+    const symbolRepoLocal   = require('./src/main/db/symbolRepo');
+    const broker = settingsRepoLocal.getBrokerConfig();
+    const symbol = symbolRepoLocal.getByName(instrument);
+    return dhanService.fetchTpoOhlc({ date, time_from, time_to, symbol, broker });
+  });
+  ipcMain.handle('symbol:updateDhanConfig', (_, id, cfg) => {
+    const symbolRepoLocal = require('./src/main/db/symbolRepo');
+    return symbolRepoLocal.updateDhanConfig(id, cfg);
+  });
+
+  // --- Broker config handlers ---
+  const settingsRepo = require('./src/main/db/settingsRepo');
+  ipcMain.handle('broker:getConfig', ()       => settingsRepo.getBrokerConfig());
+  ipcMain.handle('broker:setConfig', (_, cfg) => settingsRepo.setBrokerConfig(cfg));
+  ipcMain.handle('broker:testConnection', async () => {
+    const dhanService = require('./src/main/services/DhanService');
+    const broker = settingsRepo.getBrokerConfig();
+    return dhanService.testConnection(broker);
+  });
 
   // --- Export handlers ---
   ipcMain.handle('export:toCSV', async (_, params) => {
@@ -637,6 +723,69 @@ function registerIpcHandlers() {
     catch (err) { return { success: false, error: err.message }; }
   });
 
+  ipcMain.handle('planTemplate:attachScreenshot', async (_, id, srcPath, fileName) => {
+    try {
+      const tplDir = path.join(getImagesDir(), '_templates');
+      if (!fs.existsSync(tplDir)) fs.mkdirSync(tplDir, { recursive: true });
+      const existing = planTemplateRepo.getById(id);
+      if (existing?.screenshot_path) {
+        const oldFull = path.join(app.getPath('userData'), existing.screenshot_path);
+        if (fs.existsSync(oldFull)) fs.unlinkSync(oldFull);
+      }
+      const destPath = path.join(tplDir, fileName);
+      fs.copyFileSync(srcPath, destPath);
+      planTemplateRepo.attachScreenshot(id, path.relative(app.getPath('userData'), destPath));
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  });
+
+  ipcMain.handle('planTemplate:attachScreenshotFromBuffer', async (_, id, uint8Array, fileName) => {
+    try {
+      const tplDir = path.join(getImagesDir(), '_templates');
+      if (!fs.existsSync(tplDir)) fs.mkdirSync(tplDir, { recursive: true });
+      const existing = planTemplateRepo.getById(id);
+      if (existing?.screenshot_path) {
+        const oldFull = path.join(app.getPath('userData'), existing.screenshot_path);
+        if (fs.existsSync(oldFull)) fs.unlinkSync(oldFull);
+      }
+      const destPath = path.join(tplDir, fileName);
+      const buf = uint8Array instanceof Buffer ? uint8Array : Buffer.from(uint8Array);
+      fs.writeFileSync(destPath, buf);
+      planTemplateRepo.attachScreenshot(id, path.relative(app.getPath('userData'), destPath));
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  });
+
+  ipcMain.handle('planTemplate:removeScreenshot', async (_, id) => {
+    try {
+      const existing = planTemplateRepo.getById(id);
+      if (existing?.screenshot_path) {
+        const fullPath = path.join(app.getPath('userData'), existing.screenshot_path);
+        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+      }
+      planTemplateRepo.removeScreenshot(id);
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  });
+
+  ipcMain.handle('planTemplate:openViewer', (_, templateData) => {
+    if (templateData.screenshot_path) {
+      templateData.screenshotFullPath = path.join(app.getPath('userData'), templateData.screenshot_path);
+    }
+    const viewer = new BrowserWindow({
+      width: 1280,
+      height: 820,
+      minWidth: 720,
+      minHeight: 500,
+      title: `${templateData.name || 'Plan Template'} — Trading Journal`,
+      backgroundColor: '#0f1117',
+      parent: mainWindow,
+      webPreferences: { nodeIntegration: true, contextIsolation: false },
+    });
+    const viewerHtml = path.join(__dirname, 'src', 'main', 'templateRefViewer.html');
+    viewer.loadFile(viewerHtml, { query: { data: encodeURIComponent(JSON.stringify(templateData)) } });
+  });
+
   // --- Day Plan handlers ---
   ipcMain.handle('dayPlan:getByTradingDay', (_, tradingDayId) => dayPlanRepo.getByTradingDay(tradingDayId));
   ipcMain.handle('dayPlan:get', (_, id) => dayPlanRepo.getById(id));
@@ -670,6 +819,9 @@ function registerIpcHandlers() {
   ipcMain.handle('dayPlanScreenshot:getByDayPlan', (_, dayPlanId, kind) =>
     dayPlanScreenshotRepo.getByDayPlan(dayPlanId, kind)
   );
-  ipcMain.handle('dayPlanScreenshot:create', (_, data) => dayPlanScreenshotRepo.create(data));
+  ipcMain.handle('dayPlanScreenshot:create', (_, data) => {
+    try { return dayPlanScreenshotRepo.create(data); }
+    catch (err) { console.error('[dayPlanScreenshot:create] failed:', err); throw err; }
+  });
   ipcMain.handle('dayPlanScreenshot:delete', (_, id) => dayPlanScreenshotRepo.delete(id));
 }

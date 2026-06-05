@@ -17,6 +17,7 @@ export function AppProvider({ children }) {
   const [refreshDatesFn, setRefreshDatesFn] = useState(null);
   const [showNoPlan, setShowNoPlan] = useState(false);
   const [language, setLanguageState] = useState(() => localStorage.getItem('tpb-language') || 'en');
+  const [statusBarInfo, setStatusBarInfo] = useState(null);
 
   const setLanguage = (lang) => {
     localStorage.setItem('tpb-language', lang);
@@ -77,6 +78,8 @@ export function AppProvider({ children }) {
     setGalleryFilters,
     language,
     setLanguage,
+    statusBarInfo,
+    setStatusBarInfo,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

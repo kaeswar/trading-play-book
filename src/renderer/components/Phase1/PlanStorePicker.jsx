@@ -188,7 +188,23 @@ function PickerCard({ template, selected, onToggle }) {
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-gray-200 truncate">{template.name}</h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-sm font-semibold text-gray-200 truncate">{template.name}</h3>
+            {(template.screenshot_path || template.description) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.api.planTemplate.openViewer(template);
+                }}
+                title="View template reference"
+                className="flex-shrink-0 text-teal-400 hover:text-teal-300 transition-colors p-0.5 rounded"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </button>
+            )}
+          </div>
           {template.group_name && (
             <p className="text-[10px] text-gray-500 mt-0.5 truncate">{template.group_name}</p>
           )}
